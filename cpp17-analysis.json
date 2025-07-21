@@ -1,0 +1,11 @@
+[0;34mRunning cpp17 analysis...[0m
+[0;34mStarting cpp17_migration analysis...[0m
+[0;32mReport generated: /Users/jerry/simulator/lpz/tools/cppcheck/reports/cpp17_migration/20250721_133745/report.json[0m
+
+[0;34mAnalysis Summary:[0m
+  Files analyzed: 0
+  Errors: [0;31m0[0m
+  Warnings: [1;33m0[0m
+  Style issues: 1932
+  Performance issues: 31
+  Analysis time: 10.95s

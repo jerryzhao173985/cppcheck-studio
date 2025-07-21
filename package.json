@@ -1,0 +1,44 @@
+{
+  "name": "cppcheck-studio",
+  "version": "1.0.0",
+  "description": "Professional C++ static analysis studio with interactive fixes",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "start": "turbo run start",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "studio": "npm run dev --workspace=@cppcheck-studio/web",
+    "api": "npm run dev --workspace=@cppcheck-studio/api"
+  },
+  "devDependencies": {
+    "turbo": "^1.11.0",
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0",
+    "prettier": "^3.1.0",
+    "eslint": "^8.55.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/cppcheck-studio"
+  },
+  "keywords": [
+    "cpp",
+    "c++",
+    "static-analysis",
+    "code-quality",
+    "cppcheck",
+    "developer-tools"
+  ],
+  "author": "CPPCheck Studio Team",
+  "license": "MIT"
+}
