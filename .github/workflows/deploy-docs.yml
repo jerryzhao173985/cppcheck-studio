@@ -1,13 +1,11 @@
-name: Deploy Static Site to GitHub Pages
+name: Deploy Docs to GitHub Pages
 
 on:
   push:
     branches: [ main ]
     paths:
       - 'docs/**'
-      - 'index.html'
-      - '_config.yml'
-      - '.github/workflows/deploy-static-site.yml'
+      - '.github/workflows/deploy-docs.yml'
   workflow_dispatch:
 
 permissions:
@@ -17,7 +15,7 @@ permissions:
 
 concurrency:
   group: "pages"
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -33,10 +31,10 @@ jobs:
     - name: Setup Pages
       uses: actions/configure-pages@v4
       
-    - name: Upload artifact
+    - name: Upload pages artifact
       uses: actions/upload-pages-artifact@v3
       with:
-        path: '.'
+        path: './docs'
         
     - name: Deploy to GitHub Pages
       id: deployment
