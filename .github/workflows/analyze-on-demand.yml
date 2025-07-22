@@ -61,7 +61,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y cppcheck
+        sudo apt-get install -y cppcheck jq
         
         cd cppcheck-studio/cppcheck-dashboard-generator
         npm ci
@@ -72,13 +72,31 @@ jobs:
     - name: Clone and analyze repository
       run: |
         echo "🔍 Analyzing repository: ${{ env.REPO }}"
-        echo "📌 Branch: ${{ env.BRANCH }}"
-        echo "📄 Max files: ${{ env.MAX_FILES }}"
+        
+        # Get default branch if not specified
+        if [ -z "${{ env.BRANCH }}" ] || [ "${{ env.BRANCH }}" = "main" ]; then
+          DEFAULT_BRANCH=$(curl -s https://api.github.com/repos/${{ env.REPO }} | jq -r .default_branch)
+          if [ "$DEFAULT_BRANCH" != "null" ] && [ -n "$DEFAULT_BRANCH" ]; then
+            BRANCH=$DEFAULT_BRANCH
+          else
+            BRANCH="${{ env.BRANCH }}"
+          fi
+        else
+          BRANCH="${{ env.BRANCH }}"
+        fi
+        
+        echo "📌 Branch: $BRANCH"
+        MAX_FILES=$(echo "${{ env.MAX_FILES }}" | cut -d. -f1)
+        echo "MAX_FILES_INT=$MAX_FILES" >> $GITHUB_ENV
+        echo "📄 Max files: $MAX_FILES"
         
         # Clone target repository
-        git clone --depth 1 --branch ${{ env.BRANCH }} \
+        git clone --depth 1 --branch $BRANCH \
           https://github.com/${{ env.REPO }}.git target-repo || {
-          echo "Failed to clone repository"
+          echo "❌ Failed to clone repository ${{ env.REPO }} (branch: $BRANCH)"
+          echo "Please check:"
+          echo "  - Repository exists and is public"
+          echo "  - Branch name is correct"
           exit 1
         }
         
@@ -92,7 +110,7 @@ jobs:
           -not -path "*/.git/*" \
           -not -path "*/vendor/*" \
           -not -path "*/third_party/*" \
-          | head -n ${{ env.MAX_FILES }} > cpp_files.txt
+          | head -n $MAX_FILES > cpp_files.txt
         
         FILE_COUNT=$(wc -l < cpp_files.txt)
         echo "FILE_COUNT=${FILE_COUNT}" >> $GITHUB_ENV
@@ -159,7 +177,7 @@ jobs:
           "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
           "files_analyzed": ${{ env.FILE_COUNT }},
           "issues_found": ${{ env.ISSUE_COUNT }},
-          "max_files": ${{ env.MAX_FILES }},
+          "max_files": ${{ env.MAX_FILES_INT }},
           "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/${{ env.ANALYSIS_ID }}/dashboard.html"
         }
         EOF
