@@ -1,67 +1,63 @@
-name: On-Demand Repository Analysis
+name: On-Demand Repository Analysis v2
 
 on:
-  repository_dispatch:
-    types: [analyze-repo]
   workflow_dispatch:
     inputs:
       repository:
-        description: 'GitHub repository to analyze (owner/repo)'
+        description: 'GitHub repository (owner/repo)'
         required: true
-        type: string
-      analysis_id:
-        description: 'Unique analysis ID for tracking (auto-generated)'
-        required: false
+        default: 'georgmartius/lpzrobots'
         type: string
       branch:
         description: 'Branch to analyze'
         required: false
-        type: string
         default: 'main'
+        type: string
       max_files:
         description: 'Maximum files to analyze'
         required: false
+        default: '5000'
         type: number
-        default: 500
       callback_url:
-        description: 'URL to POST results to when complete'
+        description: 'Webhook URL for completion notification'
+        required: false
+        type: string
+      analysis_id:
+        description: 'Custom analysis ID'
         required: false
         type: string
 
-permissions:
-  contents: write
-  pages: write
-  id-token: write
-  actions: read
-
 jobs:
   analyze:
-    name: Analyze C++ Repository
     runs-on: ubuntu-latest
+    name: Analyze C++ Repository
     
     steps:
     - name: Parse inputs
       run: |
-        # Handle both workflow_dispatch and repository_dispatch
-        if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
-          echo "REPO=${{ github.event.client_payload.repository }}" >> $GITHUB_ENV
-          echo "BRANCH=${{ github.event.client_payload.branch || 'main' }}" >> $GITHUB_ENV
-          echo "MAX_FILES=${{ github.event.client_payload.max_files || 500 }}" >> $GITHUB_ENV
-          echo "CALLBACK_URL=${{ github.event.client_payload.callback_url }}" >> $GITHUB_ENV
-          echo "ANALYSIS_ID=${{ github.event.client_payload.analysis_id || '$(date +%s)-$(echo $RANDOM)' }}" >> $GITHUB_ENV
+        echo "🎯 Starting analysis with inputs:"
+        echo "Repository: ${{ github.event.inputs.repository }}"
+        echo "Branch: ${{ github.event.inputs.branch }}"
+        echo "Max files: ${{ github.event.inputs.max_files }}"
+        
+        # Set environment variables
+        echo "REPO=${{ github.event.inputs.repository }}" >> $GITHUB_ENV
+        echo "BRANCH=${{ github.event.inputs.branch || 'main' }}" >> $GITHUB_ENV
+        echo "MAX_FILES=${{ github.event.inputs.max_files || '5000' }}" >> $GITHUB_ENV
+        echo "CALLBACK_URL=${{ github.event.inputs.callback_url }}" >> $GITHUB_ENV
+        
+        # Generate or use provided analysis ID
+        if [ -n "${{ github.event.inputs.analysis_id }}" ]; then
+          echo "ANALYSIS_ID=${{ github.event.inputs.analysis_id }}" >> $GITHUB_ENV
         else
-          echo "REPO=${{ github.event.inputs.repository }}" >> $GITHUB_ENV
-          echo "BRANCH=${{ github.event.inputs.branch }}" >> $GITHUB_ENV
-          echo "MAX_FILES=${{ github.event.inputs.max_files }}" >> $GITHUB_ENV
-          echo "CALLBACK_URL=${{ github.event.inputs.callback_url }}" >> $GITHUB_ENV
-          
-          # Use provided analysis ID or generate one
-          if [ -n "${{ github.event.inputs.analysis_id }}" ]; then
-            echo "ANALYSIS_ID=${{ github.event.inputs.analysis_id }}" >> $GITHUB_ENV
-          else
-            echo "ANALYSIS_ID=$(date +%s)-$(echo $RANDOM)" >> $GITHUB_ENV
-          fi
+          # Generate timestamp-based ID with random suffix
+          TIMESTAMP=$(date +%s)
+          RANDOM_SUFFIX=$(openssl rand -hex 4)
+          echo "ANALYSIS_ID=${TIMESTAMP}-${RANDOM_SUFFIX}" >> $GITHUB_ENV
         fi
+        
+        # Set workflow URL for status tracking
+        echo "WORKFLOW_URL=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_ENV
 
     - name: Checkout CPPCheck Studio
       uses: actions/checkout@v4
@@ -85,6 +81,7 @@ jobs:
         cd ../..
 
     - name: Clone and analyze repository
+      id: analyze
       run: |
         echo "🔍 Analyzing repository: ${{ env.REPO }}"
         
@@ -144,7 +141,12 @@ jobs:
         
         echo "✅ Found ${FILE_COUNT} C++ files to analyze"
         
+        # Show sample of files being analyzed
+        echo "📋 Sample files:"
+        head -10 cpp_files.txt
+        
         # Run cppcheck
+        echo "🔧 Running cppcheck analysis..."
         cppcheck \
           --enable=all \
           --inconclusive \
@@ -159,52 +161,80 @@ jobs:
         cd ..
         
         # Convert to JSON
+        echo "📊 Converting results to JSON..."
         python3 cppcheck-studio/xml2json-simple.py cppcheck-results.xml > analysis.json
         
         # Get issue count
         ISSUE_COUNT=$(python3 -c "import json; print(len(json.load(open('analysis.json'))['issues']))")
         echo "ISSUE_COUNT=${ISSUE_COUNT}" >> $GITHUB_ENV
+        echo "📈 Total issues found: ${ISSUE_COUNT}"
         
         # Add code context
+        echo "📝 Adding code context..."
         cd target-repo
         python3 ../cppcheck-studio/add-code-context.py ../analysis.json ../analysis-with-context.json
         cd ..
+        
+        # Verify the data
+        echo "🔍 Verifying analysis data..."
+        node cppcheck-studio/scripts/verify-dashboard.js analysis-with-context.json || true
 
-    - name: Create status update
+    - name: Create real-time status update
       if: always()
       run: |
-        # Create status directory in output
+        # Create status directory
         mkdir -p output/status
         
-        # Create status file
+        # Create live status file with more details
         cat > output/status/${{ env.ANALYSIS_ID }}.json << EOF
         {
           "analysis_id": "${{ env.ANALYSIS_ID }}",
           "repository": "${{ env.REPO }}",
+          "branch": "${{ env.BRANCH }}",
+          "commit": "${{ env.COMMIT_SHA }}",
           "status": "running",
           "workflow_run_id": "${{ github.run_id }}",
-          "workflow_run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+          "workflow_run_url": "${{ env.WORKFLOW_URL }}",
+          "started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
           "updated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-          "message": "Generating dashboard..."
+          "progress": {
+            "files_found": ${{ env.FILE_COUNT || 0 }},
+            "files_analyzed": ${{ env.FILE_COUNT || 0 }},
+            "issues_found": ${{ env.ISSUE_COUNT || 0 }},
+            "current_step": "Generating dashboard"
+          },
+          "message": "Analysis complete. Generating interactive dashboard..."
         }
         EOF
-        
-    - name: Generate dashboard
+
+    - name: Generate enhanced dashboard
       run: |
         # Create output directory
         mkdir -p output
         
-        # Debug: Show current directory and files
-        echo "Current directory: $(pwd)"
-        echo "Files in current directory:"
-        ls -la | head -10
-        echo "Checking analysis file:"
-        ls -la analysis-with-context.json
-        echo "First few issues:"
-        head -c 1000 analysis-with-context.json
+        # Show what we're working with
+        echo "📁 Current directory: $(pwd)"
+        echo "📄 Analysis file size: $(ls -lh analysis-with-context.json | awk '{print $5}')"
+        echo "📊 First 5 issues from analysis:"
+        python3 -c "
+import json
+with open('analysis-with-context.json') as f:
+    data = json.load(f)
+    issues = data.get('issues', [])
+    print(f'Total issues: {len(issues)}')
+    for i, issue in enumerate(issues[:5]):
+        print(f'\\nIssue {i+1}:')
+        print(f'  File: {issue.get(\"file\", \"N/A\")}')
+        print(f'  Line: {issue.get(\"line\", \"N/A\")}')
+        print(f'  Severity: {issue.get(\"severity\", \"N/A\")}')
+        print(f'  Message: {issue.get(\"message\", \"N/A\")[:80]}...')
+        print(f'  Has context: {\"code_context\" in issue}')
+"
         
-        # Generate dashboard
+        # Generate dashboard with enhanced features
         PROJECT_NAME="${{ env.REPO }}"
+        echo "🎨 Generating dashboard for ${PROJECT_NAME}..."
+        
         cppcheck-dashboard \
           analysis-with-context.json \
           output/dashboard-${{ env.ANALYSIS_ID }}.html \
@@ -212,13 +242,18 @@ jobs:
           --project "${PROJECT_NAME} (${{ env.COMMIT_SHA }})" \
           --verbose
         
+        # Verify the generated dashboard
+        echo "✅ Verifying generated dashboard..."
+        node cppcheck-studio/scripts/verify-dashboard.js output/dashboard-${{ env.ANALYSIS_ID }}.html || true
+        
         # Generate summary
         python3 cppcheck-studio/scripts/generate-summary.py analysis.json > output/summary.txt
         
         # Generate detailed report
         python3 cppcheck-studio/scripts/generate-detailed-report.py analysis.json > output/report.md
         
-        # Create metadata
+        # Create enhanced metadata with direct links
+        DASHBOARD_URL="https://jerryzhao173985.github.io/cppcheck-studio/results/${{ env.ANALYSIS_ID }}/index.html"
         cat > output/metadata.json << EOF
         {
           "analysis_id": "${{ env.ANALYSIS_ID }}",
@@ -229,7 +264,15 @@ jobs:
           "files_analyzed": ${{ env.FILE_COUNT }},
           "issues_found": ${{ env.ISSUE_COUNT }},
           "max_files": ${{ env.MAX_FILES_INT }},
-          "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/${{ env.ANALYSIS_ID }}/dashboard.html"
+          "dashboard_url": "${DASHBOARD_URL}",
+          "workflow_url": "${{ env.WORKFLOW_URL }}",
+          "status": "completed",
+          "links": {
+            "dashboard": "${DASHBOARD_URL}",
+            "workflow": "${{ env.WORKFLOW_URL }}",
+            "api_status": "https://jerryzhao173985.github.io/cppcheck-studio/api/status/${{ env.ANALYSIS_ID }}.json",
+            "api_metadata": "https://jerryzhao173985.github.io/cppcheck-studio/api/analyses/${{ env.ANALYSIS_ID }}.json"
+          }
         }
         EOF
 
@@ -243,8 +286,9 @@ jobs:
           output/report.md
           output/metadata.json
           analysis.json
+          analysis-with-context.json
 
-    - name: Update analysis results and status
+    - name: Deploy results and update status
       if: github.ref == 'refs/heads/main'
       run: |
         # Clone the repo with authentication
@@ -261,47 +305,96 @@ jobs:
         cp ../output/metadata.json docs/results/${{ env.ANALYSIS_ID }}/
         cp ../output/metadata.json docs/api/analyses/${{ env.ANALYSIS_ID }}.json
         
-        # Create final status
+        # Create final status with complete information
         cat > docs/api/status/${{ env.ANALYSIS_ID }}.json << EOF
         {
           "analysis_id": "${{ env.ANALYSIS_ID }}",
           "repository": "${{ env.REPO }}",
+          "branch": "${{ env.BRANCH }}",
+          "commit": "${{ env.COMMIT_SHA }}",
           "status": "completed",
           "workflow_run_id": "${{ github.run_id }}",
-          "workflow_run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+          "workflow_run_url": "${{ env.WORKFLOW_URL }}",
+          "started_at": "$(date -u -d '5 minutes ago' +%Y-%m-%dT%H:%M:%SZ)",
           "completed_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
           "files_analyzed": ${{ env.FILE_COUNT }},
           "issues_found": ${{ env.ISSUE_COUNT }},
-          "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/${{ env.ANALYSIS_ID }}/index.html"
+          "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/${{ env.ANALYSIS_ID }}/index.html",
+          "message": "Analysis completed successfully! View the interactive dashboard to explore all ${{ env.ISSUE_COUNT }} issues found."
         }
         EOF
         
-        # Update gallery
-        if [ -f docs/api/gallery.json ]; then
-          jq --argjson new "$(cat docs/api/analyses/${{ env.ANALYSIS_ID }}.json)" \
-            '.analyses = ([$new] + .analyses | unique_by(.analysis_id) | .[0:50])' \
-            docs/api/gallery.json > temp.json
-          mv temp.json docs/api/gallery.json
-        else
-          jq -n --argjson metadata "$(cat docs/api/analyses/${{ env.ANALYSIS_ID }}.json)" \
-            '{analyses: [$metadata]}' > docs/api/gallery.json
+        # Update gallery.json with the new analysis
+        if [ -f docs/gallery.json ]; then
+          # Add new analysis to gallery
+          python3 << 'PYTHON_SCRIPT'
+import json
+from datetime import datetime
+
+gallery_path = 'docs/gallery.json'
+with open(gallery_path) as f:
+    gallery = json.load(f)
+
+new_analysis = {
+    "id": "${{ env.ANALYSIS_ID }}",
+    "repository": "${{ env.REPO }}",
+    "branch": "${{ env.BRANCH }}",
+    "commit": "${{ env.COMMIT_SHA }}",
+    "timestamp": datetime.utcnow().isoformat() + "Z",
+    "files_analyzed": ${{ env.FILE_COUNT }},
+    "issues_found": ${{ env.ISSUE_COUNT }},
+    "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/${{ env.ANALYSIS_ID }}/index.html",
+    "workflow_url": "${{ env.WORKFLOW_URL }}"
+}
+
+# Add to beginning of analyses list
+gallery['analyses'].insert(0, new_analysis)
+
+# Keep only last 50 analyses
+gallery['analyses'] = gallery['analyses'][:50]
+
+# Update metadata
+gallery['total_analyses'] = len(gallery['analyses'])
+gallery['last_updated'] = datetime.utcnow().isoformat() + "Z"
+
+with open(gallery_path, 'w') as f:
+    json.dump(gallery, f, indent=2)
+PYTHON_SCRIPT
         fi
         
         # Commit and push
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
-        git add docs/
-        git commit -m "Add analysis results for ${{ env.REPO }} (#${{ env.ANALYSIS_ID }})" || echo "No changes"
+        git add .
+        git commit -m "Add analysis results for ${{ env.REPO }} (#${{ env.ANALYSIS_ID }})"
         git push
 
-    - name: Send callback if provided
-      if: env.CALLBACK_URL != ''
+    - name: Send callback notification
+      if: always() && env.CALLBACK_URL != ''
       run: |
-        # Send results to callback URL
-        curl -X POST ${{ env.CALLBACK_URL }} \
+        # Prepare callback payload
+        DASHBOARD_URL="https://jerryzhao173985.github.io/cppcheck-studio/results/${{ env.ANALYSIS_ID }}/index.html"
+        
+        PAYLOAD=$(cat <<EOF
+        {
+          "analysis_id": "${{ env.ANALYSIS_ID }}",
+          "status": "${{ job.status }}",
+          "repository": "${{ env.REPO }}",
+          "branch": "${{ env.BRANCH }}",
+          "commit": "${{ env.COMMIT_SHA }}",
+          "files_analyzed": ${{ env.FILE_COUNT || 0 }},
+          "issues_found": ${{ env.ISSUE_COUNT || 0 }},
+          "dashboard_url": "${DASHBOARD_URL}",
+          "workflow_url": "${{ env.WORKFLOW_URL }}",
+          "completed_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        }
+        EOF
+        )
+        
+        # Send callback
+        curl -X POST "${{ env.CALLBACK_URL }}" \
           -H "Content-Type: application/json" \
-          -d @output/metadata.json \
-          || echo "Failed to send callback"
+          -d "$PAYLOAD" || echo "Callback notification failed"
 
     - name: Create enhanced job summary
       if: always()
@@ -323,16 +416,11 @@ jobs:
         
         ## 🔗 Links
         - [🎯 **View Interactive Dashboard** →](${DASHBOARD_URL})
-        - [📊 View Workflow Details](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+        - [📊 View Workflow Details](${{ env.WORKFLOW_URL }})
         - [📁 View Analysis Artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts)
         
-        ## 📈 Issue Breakdown
-        \`\`\`
-        $(cat output/summary.txt 2>/dev/null || echo "Summary not available")
-        \`\`\`
-        
         ## 🚀 Next Steps
-        1. Click the dashboard link above to explore all issues interactively
+        1. Click the dashboard link above to explore all issues
         2. Use filters to focus on specific severity levels
         3. Click on issues to see code context
         4. Share the dashboard URL with your team
