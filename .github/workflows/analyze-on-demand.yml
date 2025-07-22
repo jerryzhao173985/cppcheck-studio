@@ -214,8 +214,13 @@ jobs:
         # Generate dashboard
         PROJECT_NAME="${{ env.REPO }}"
         
-        # Check which generator to use
-        if [ -f cppcheck-studio/generate/generate-enhanced-dashboard.py ]; then
+        # Check which generator to use (prioritize optimized dashboard)
+        if [ -f cppcheck-studio/generate/generate-optimized-dashboard.py ]; then
+          echo "Using optimized dashboard generator (developer-focused workflow)..."
+          python3 cppcheck-studio/generate/generate-optimized-dashboard.py \
+            analysis-with-context.json \
+            output/dashboard-${{ env.ANALYSIS_ID }}.html
+        elif [ -f cppcheck-studio/generate/generate-enhanced-dashboard.py ]; then
           echo "Using enhanced dashboard generator (beautiful UI with animations)..."
           python3 cppcheck-studio/generate/generate-enhanced-dashboard.py \
             analysis-with-context.json \
