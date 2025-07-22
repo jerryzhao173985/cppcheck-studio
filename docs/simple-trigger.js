@@ -1,55 +1,95 @@
-// Simple trigger mechanism using GitHub workflow dispatch
+// Enhanced trigger mechanism with better automation
 class SimpleTrigger {
     constructor() {
-        // Direct link to the actual analysis workflow
         this.workflowUrl = 'https://github.com/jerryzhao173985/cppcheck-studio/actions/workflows/analyze-on-demand.yml';
         this.apiBase = 'https://jerryzhao173985.github.io/cppcheck-studio/api';
+        this.repoApiBase = 'https://api.github.com/repos/jerryzhao173985/cppcheck-studio';
     }
     
     async triggerAnalysis(repository) {
         const analysisId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const triggerTime = new Date().toISOString();
         
-        // Store locally
-        const analyses = JSON.parse(localStorage.getItem('analyses') || '[]');
+        // Store locally with enhanced metadata
+        const analyses = JSON.parse(localStorage.getItem('cppcheck-analyses') || '[]');
         analyses.unshift({
             id: analysisId,
             repository,
             status: 'pending',
-            timestamp: new Date().toISOString()
+            timestamp: triggerTime,
+            workflowTriggered: false
         });
-        localStorage.setItem('analyses', JSON.stringify(analyses.slice(0, 100)));
+        localStorage.setItem('cppcheck-analyses', JSON.stringify(analyses.slice(0, 100)));
         
-        // Return workflow dispatch URL with pre-filled repository
-        const dispatchUrl = `${this.workflowUrl}?repository=${encodeURIComponent(repository)}`;
+        // Create pre-filled workflow URL
+        const params = new URLSearchParams({
+            repository: repository,
+            analysis_id: analysisId
+        });
+        const dispatchUrl = `${this.workflowUrl}?${params}`;
         
+        // Enhanced instructions with the analysis ID
         return {
             success: true,
             analysisId,
             dispatchUrl,
+            repository,
+            triggerTime,
             instructions: [
-                'Click the button to open GitHub workflow page',
-                'Click "Run workflow" dropdown',
-                'Enter the repository name in the field',
-                'Click the green "Run workflow" button',
-                'Analysis will start processing your repository'
-            ]
+                'Click the button below to open GitHub Actions',
+                'Click the "Run workflow" dropdown button',
+                'The repository field should show: <strong>' + repository + '</strong>',
+                'Optionally add this Analysis ID: <code>' + analysisId + '</code>',
+                'Click the green "Run workflow" button to start'
+            ],
+            tracking: {
+                analysisId,
+                checkStatusUrl: `${this.apiBase}/status/${analysisId}.json`,
+                resultsUrl: `https://jerryzhao173985.github.io/cppcheck-studio/results/${analysisId}/`
+            }
         };
     }
     
-    async checkAnalyses() {
+    async checkAnalysisStatus(analysisId) {
         try {
-            // Try to fetch from GitHub Pages API
-            const response = await fetch(`${this.apiBase}/index.json?t=${Date.now()}`);
-            if (response.ok) {
-                const data = await response.json();
-                return data.analyses || [];
+            // First check status endpoint
+            const statusResponse = await fetch(`${this.apiBase}/status/${analysisId}.json?t=${Date.now()}`);
+            if (statusResponse.ok) {
+                const status = await statusResponse.json();
+                return {
+                    found: true,
+                    status: status.status,
+                    data: status
+                };
+            }
+            
+            // Then check gallery for completed analyses
+            const galleryResponse = await fetch(`${this.apiBase}/gallery.json?t=${Date.now()}`);
+            if (galleryResponse.ok) {
+                const gallery = await galleryResponse.json();
+                const analysis = gallery.analyses?.find(a => a.analysis_id === analysisId);
+                if (analysis) {
+                    return {
+                        found: true,
+                        status: 'completed',
+                        data: analysis
+                    };
+                }
             }
         } catch (e) {
-            console.log('Using local data:', e);
+            console.log('Status check error:', e);
         }
         
-        // Fall back to local storage
-        return JSON.parse(localStorage.getItem('analyses') || '[]');
+        return {
+            found: false,
+            status: 'unknown'
+        };
+    }
+    
+    async getWorkflowRuns() {
+        // This would require authentication, so we'll skip for now
+        // In production, this would check actual GitHub workflow runs
+        return [];
     }
     
     async updateLocalAnalyses() {

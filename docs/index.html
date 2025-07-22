@@ -626,12 +626,12 @@
                         
                         <h4 style="margin-top: 20px; margin-bottom: 10px;">📋 Quick Instructions:</h4>
                         <ol style="margin: 10px 0; padding-left: 20px; color: #4b5563; line-height: 1.8;">
-                            <li>Click the button above to open GitHub</li>
-                            <li>Click the <strong>"Run workflow"</strong> dropdown button</li>
-                            <li>In the repository field, enter: <code style="background: #e5e7eb; padding: 2px 6px; border-radius: 3px;">${repo}</code></li>
-                            <li>Click the green <strong>"Run workflow"</strong> button</li>
-                            <li>The analysis will start immediately!</li>
+                            ${result.instructions.map(step => `<li>${step}</li>`).join('')}
                         </ol>
+                        
+                        <div style="background: #fff3cd; padding: 10px; border-radius: 5px; margin-top: 15px;">
+                            <strong>💡 Tip:</strong> Your analysis is being tracked with ID: <code>${result.analysisId}</code>
+                        </div>
                     </div>
                     
                     <p style="color: #666; font-size: 0.9em;">
@@ -659,56 +659,80 @@
         
         async function pollAnalysisStatus(analysisId) {
             let attempts = 0;
+            const trigger = new SimpleTrigger();
             
             const poll = async () => {
                 attempts++;
                 
                 try {
-                    // Check if analysis results exist in our gallery
-                    const response = await fetch(`api/gallery.json?t=${Date.now()}`);
-                    if (response.ok) {
-                        const data = await response.json();
-                        const analysis = data.analyses?.find(a => a.analysis_id === analysisId);
+                    // Use enhanced status checking
+                    const statusCheck = await trigger.checkAnalysisStatus(analysisId);
+                    
+                    if (statusCheck.found) {
+                        const data = statusCheck.data;
                         
-                        if (analysis) {
+                        if (statusCheck.status === 'running') {
+                            // Show running status
+                            showStatus('info', `🔄 Analysis in progress... (${data.message || 'Processing'})`);
+                            
+                            // Add workflow link if available
+                            if (data.workflow_run_url) {
+                                const statusEl = document.getElementById('statusMessage');
+                                statusEl.innerHTML += ` <a href="${data.workflow_run_url}" target="_blank">View Workflow →</a>`;
+                            }
+                        } else if (statusCheck.status === 'completed') {
                             // Analysis complete!
-                            showStatus('success', `✅ Analysis completed! Found ${analysis.issues_found} issues in ${analysis.files_analyzed} files`);
+                            showStatus('success', `✅ Analysis completed! Found ${data.issues_found} issues in ${data.files_analyzed} files`);
                             
                             // Show results preview with real data
-                            showResultsPreview(analysis.repository, {
-                                analysisId: analysis.analysis_id,
+                            showResultsPreview(data.repository, {
+                                analysisId: data.analysis_id,
                                 summary: {
-                                    filesAnalyzed: analysis.files_analyzed,
-                                    errors: Math.floor(analysis.issues_found * 0.3),
-                                    warnings: Math.floor(analysis.issues_found * 0.2),
-                                    style: Math.floor(analysis.issues_found * 0.5)
+                                    filesAnalyzed: data.files_analyzed,
+                                    errors: Math.floor(data.issues_found * 0.3),
+                                    warnings: Math.floor(data.issues_found * 0.2),
+                                    style: Math.floor(data.issues_found * 0.5)
                                 },
-                                dashboardUrl: `results/${analysis.analysis_id}/index.html`
+                                dashboardUrl: data.dashboard_url || `results/${data.analysis_id}/index.html`
                             });
                             
                             updateHistoryStatus(analysisId, { 
                                 status: 'completed', 
-                                issues: analysis.issues_found,
-                                files: analysis.files_analyzed 
+                                issues: data.issues_found,
+                                files: data.files_analyzed,
+                                workflowUrl: data.workflow_run_url
                             });
                             loadHistory();
+                            return;
+                        } else if (statusCheck.status === 'failed') {
+                            // Analysis failed
+                            showStatus('error', `❌ Analysis failed: ${data.message || 'Unknown error'}`);
+                            
+                            updateHistoryStatus(analysisId, { 
+                                status: 'failed',
+                                error: data.message
+                            });
                             return;
                         }
                     }
                 } catch (e) {
-                    console.log('Polling for results:', e);
+                    console.log('Polling error:', e);
                 }
                 
-                // Continue polling
-                if (attempts < 60) { // Poll for up to 5 minutes
-                    setTimeout(poll, 5000); // Check every 5 seconds
+                // Continue polling with backoff
+                if (attempts < 120) { // Poll for up to 10 minutes
+                    const delay = attempts < 20 ? 5000 : 10000; // 5s for first 20 attempts, then 10s
+                    setTimeout(poll, delay);
                 } else {
-                    showStatus('info', 'Analysis is taking longer than expected. Check GitHub Actions for status.');
+                    showStatus('info', '⏱️ Analysis is taking longer than expected. <a href="https://github.com/jerryzhao173985/cppcheck-studio/actions" target="_blank">Check GitHub Actions</a>');
                 }
             };
             
-            // Start polling after a delay
-            setTimeout(poll, 10000);
+            // Show initial status
+            showStatus('info', '🚀 Analysis queued! Waiting for workflow to start...');
+            
+            // Start polling after a short delay
+            setTimeout(poll, 3000);
         }
         
         function updateHistoryStatus(analysisId, status) {

@@ -1,0 +1,267 @@
+name: Analyze Repository (Dispatch)
+
+on:
+  repository_dispatch:
+    types: [analyze-request]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+  actions: write
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Set up analysis
+      run: |
+        # Extract all parameters from the event payload
+        echo "ANALYSIS_ID=${{ github.event.client_payload.analysis_id }}" >> $GITHUB_ENV
+        echo "REPO=${{ github.event.client_payload.repository }}" >> $GITHUB_ENV
+        echo "BRANCH=${{ github.event.client_payload.branch || 'default' }}" >> $GITHUB_ENV
+        echo "MAX_FILES=${{ github.event.client_payload.max_files || 500 }}" >> $GITHUB_ENV
+        echo "TRIGGER_TIME=${{ github.event.client_payload.trigger_time }}" >> $GITHUB_ENV
+        
+        # Store workflow run ID for tracking
+        echo "WORKFLOW_RUN_ID=${{ github.run_id }}" >> $GITHUB_ENV
+        echo "WORKFLOW_RUN_URL=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_ENV
+        
+    - name: Update status - Started
+      run: |
+        # Create status file that the website can check
+        mkdir -p status-updates
+        cat > status-updates/status-${{ env.ANALYSIS_ID }}.json << EOF
+        {
+          "analysis_id": "${{ env.ANALYSIS_ID }}",
+          "repository": "${{ env.REPO }}",
+          "status": "running",
+          "workflow_run_id": "${{ env.WORKFLOW_RUN_ID }}",
+          "workflow_run_url": "${{ env.WORKFLOW_RUN_URL }}",
+          "started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "message": "Analysis started"
+        }
+        EOF
+        
+    - name: Checkout CPPCheck Studio
+      uses: actions/checkout@v4
+      with:
+        path: cppcheck-studio
+        
+    - name: Setup environment
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cppcheck jq
+        
+        cd cppcheck-studio/cppcheck-dashboard-generator
+        npm ci
+        npm run build
+        sudo npm link
+        cd ../..
+        
+    - name: Clone and analyze repository
+      id: analyze
+      run: |
+        echo "🔍 Analyzing repository: ${{ env.REPO }}"
+        
+        # Get default branch if needed
+        if [ "${{ env.BRANCH }}" = "default" ]; then
+          DEFAULT_BRANCH=$(curl -s https://api.github.com/repos/${{ env.REPO }} | jq -r .default_branch)
+          if [ "$DEFAULT_BRANCH" != "null" ] && [ -n "$DEFAULT_BRANCH" ]; then
+            BRANCH=$DEFAULT_BRANCH
+          else
+            BRANCH="main"
+          fi
+        else
+          BRANCH="${{ env.BRANCH }}"
+        fi
+        
+        echo "ACTUAL_BRANCH=$BRANCH" >> $GITHUB_ENV
+        echo "📌 Branch: $BRANCH"
+        
+        # Clone repository
+        git clone --depth 1 --branch $BRANCH \
+          https://github.com/${{ env.REPO }}.git target-repo || {
+          echo "ANALYSIS_FAILED=true" >> $GITHUB_ENV
+          echo "ERROR_MESSAGE=Failed to clone repository" >> $GITHUB_ENV
+          exit 1
+        }
+        
+        cd target-repo
+        COMMIT_SHA=$(git rev-parse --short HEAD)
+        echo "COMMIT_SHA=${COMMIT_SHA}" >> $GITHUB_ENV
+        
+        # Find C++ files
+        find . -type f \( -name "*.cpp" -o -name "*.cc" -o -name "*.cxx" -o -name "*.c" -o -name "*.h" -o -name "*.hpp" \) \
+          -not -path "*/build/*" \
+          -not -path "*/.git/*" \
+          -not -path "*/vendor/*" \
+          -not -path "*/third_party/*" \
+          | head -n ${{ env.MAX_FILES }} > cpp_files.txt
+        
+        FILE_COUNT=$(wc -l < cpp_files.txt)
+        echo "FILE_COUNT=${FILE_COUNT}" >> $GITHUB_ENV
+        
+        if [ ${FILE_COUNT} -eq 0 ]; then
+          echo "ANALYSIS_FAILED=true" >> $GITHUB_ENV
+          echo "ERROR_MESSAGE=No C++ files found" >> $GITHUB_ENV
+          exit 1
+        fi
+        
+        echo "✅ Found ${FILE_COUNT} C++ files to analyze"
+        
+        # Run cppcheck
+        cppcheck \
+          --enable=all \
+          --inconclusive \
+          --suppress=missingIncludeSystem \
+          --std=c++17 \
+          --xml \
+          --xml-version=2 \
+          --file-list=cpp_files.txt \
+          -j $(nproc) \
+          2> ../cppcheck-results.xml || true
+        
+        cd ..
+        
+        # Convert to JSON
+        python3 cppcheck-studio/xml2json-simple.py cppcheck-results.xml > analysis.json
+        
+        # Get issue count
+        ISSUE_COUNT=$(python3 -c "import json; print(len(json.load(open('analysis.json'))['issues']))")
+        echo "ISSUE_COUNT=${ISSUE_COUNT}" >> $GITHUB_ENV
+        
+        # Add code context
+        cd target-repo
+        python3 ../cppcheck-studio/add-code-context.py ../analysis.json ../analysis-with-context.json
+        cd ..
+        
+    - name: Generate dashboard
+      if: env.ANALYSIS_FAILED != 'true'
+      run: |
+        mkdir -p output
+        
+        # Generate dashboard
+        cppcheck-dashboard \
+          analysis-with-context.json \
+          output/dashboard.html \
+          --title "${{ env.REPO }} Analysis" \
+          --project "${{ env.REPO }} (${{ env.COMMIT_SHA }})"
+        
+        # Generate reports
+        python3 cppcheck-studio/scripts/generate-summary.py analysis.json > output/summary.txt
+        python3 cppcheck-studio/scripts/generate-detailed-report.py analysis.json > output/report.md
+        
+        # Create metadata
+        cat > output/metadata.json << EOF
+        {
+          "analysis_id": "${{ env.ANALYSIS_ID }}",
+          "repository": "${{ env.REPO }}",
+          "branch": "${{ env.ACTUAL_BRANCH }}",
+          "commit": "${{ env.COMMIT_SHA }}",
+          "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "files_analyzed": ${{ env.FILE_COUNT }},
+          "issues_found": ${{ env.ISSUE_COUNT }},
+          "max_files": ${{ env.MAX_FILES }},
+          "workflow_run_id": "${{ env.WORKFLOW_RUN_ID }}",
+          "workflow_run_url": "${{ env.WORKFLOW_RUN_URL }}",
+          "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/${{ env.ANALYSIS_ID }}/index.html"
+        }
+        EOF
+        
+    - name: Update results in repository
+      if: env.ANALYSIS_FAILED != 'true'
+      run: |
+        # Create results directory
+        mkdir -p cppcheck-studio/docs/results/${{ env.ANALYSIS_ID }}
+        mkdir -p cppcheck-studio/docs/api/analyses
+        
+        # Copy results
+        cp output/dashboard.html cppcheck-studio/docs/results/${{ env.ANALYSIS_ID }}/index.html
+        cp output/metadata.json cppcheck-studio/docs/results/${{ env.ANALYSIS_ID }}/
+        cp output/summary.txt cppcheck-studio/docs/results/${{ env.ANALYSIS_ID }}/ || true
+        
+        # Store individual analysis
+        cp output/metadata.json cppcheck-studio/docs/api/analyses/${{ env.ANALYSIS_ID }}.json
+        
+        # Update gallery
+        cd cppcheck-studio
+        GALLERY_FILE="docs/api/gallery.json"
+        if [ -f "$GALLERY_FILE" ]; then
+          jq --argjson new "$(cat docs/api/analyses/${{ env.ANALYSIS_ID }}.json)" \
+            '.analyses = ([$new] + .analyses | unique_by(.analysis_id) | .[0:50])' \
+            "$GALLERY_FILE" > temp.json
+          mv temp.json "$GALLERY_FILE"
+        else
+          jq -n --argjson metadata "$(cat docs/api/analyses/${{ env.ANALYSIS_ID }}.json)" \
+            '{analyses: [$metadata]}' > "$GALLERY_FILE"
+        fi
+        
+        # Update main index
+        cp "$GALLERY_FILE" docs/api/index.json
+        
+        # Commit and push
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        git add docs/results docs/api
+        git commit -m "Add analysis results for ${{ env.REPO }} (#${{ env.ANALYSIS_ID }})" || echo "No changes"
+        git push
+        
+    - name: Update final status
+      if: always()
+      run: |
+        cd cppcheck-studio
+        
+        # Determine final status
+        if [ "${{ env.ANALYSIS_FAILED }}" = "true" ]; then
+          STATUS="failed"
+          MESSAGE="${{ env.ERROR_MESSAGE }}"
+        else
+          STATUS="completed"
+          MESSAGE="Analysis completed successfully"
+        fi
+        
+        # Create final status
+        mkdir -p docs/api/status
+        cat > docs/api/status/${{ env.ANALYSIS_ID }}.json << EOF
+        {
+          "analysis_id": "${{ env.ANALYSIS_ID }}",
+          "repository": "${{ env.REPO }}",
+          "status": "$STATUS",
+          "workflow_run_id": "${{ env.WORKFLOW_RUN_ID }}",
+          "workflow_run_url": "${{ env.WORKFLOW_RUN_URL }}",
+          "completed_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "message": "$MESSAGE",
+          "files_analyzed": ${{ env.FILE_COUNT || 0 }},
+          "issues_found": ${{ env.ISSUE_COUNT || 0 }},
+          "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/${{ env.ANALYSIS_ID }}/index.html"
+        }
+        EOF
+        
+        # Commit status
+        git add docs/api/status
+        git commit -m "Update status for analysis ${{ env.ANALYSIS_ID }}" || echo "No changes"
+        git push || echo "Push failed, will retry"
+        
+        # Retry push if needed
+        if [ $? -ne 0 ]; then
+          git pull --rebase
+          git push
+        fi
+        
+    - name: Trigger pages deployment
+      if: env.ANALYSIS_FAILED != 'true'
+      run: |
+        # Trigger GitHub Pages deployment
+        curl -X POST \
+          -H "Accept: application/vnd.github+json" \
+          -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          https://api.github.com/repos/${{ github.repository }}/actions/workflows/deploy-docs.yml/dispatches \
+          -d '{"ref":"main"}'
