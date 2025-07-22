@@ -113,6 +113,13 @@ jobs:
         COMMIT_SHA=$(git rev-parse --short HEAD)
         echo "COMMIT_SHA=${COMMIT_SHA}" >> $GITHUB_ENV
         
+        # Log repository info
+        echo "📦 Successfully cloned: ${{ env.REPO }}"
+        echo "🔖 Commit: ${COMMIT_SHA}"
+        echo "📁 Current directory: $(pwd)"
+        echo "📊 Repository structure:"
+        ls -la | head -10
+        
         # Find C++ files
         find . -type f \( -name "*.cpp" -o -name "*.cc" -o -name "*.cxx" -o -name "*.c" -o -name "*.h" -o -name "*.hpp" \) \
           -not -path "*/build/*" \
@@ -224,8 +231,8 @@ jobs:
     - name: Update analysis results and status
       if: github.ref == 'refs/heads/main'
       run: |
-        # Clone the repo to update results
-        git clone https://github.com/${{ github.repository }}.git deploy-repo
+        # Clone the repo with authentication
+        git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git deploy-repo
         cd deploy-repo
         
         # Create directories
