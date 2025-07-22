@@ -63,14 +63,14 @@ jobs:
             fi
             
             # Create badge JSON
-            cat > badge.json << EOF
+            cat > badge.json << 'EOF'
             {
               "schemaVersion": 1,
               "label": "cppcheck",
               "message": "$TOTAL issues",
               "color": "$COLOR"
             }
-            EOF
+EOF
             
             echo "Total issues: $TOTAL"
             echo "Errors: $ERRORS"
@@ -90,7 +90,7 @@ jobs:
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
             https://api.github.com/gists/$GIST_ID \
-            -d @- << EOF
+            -d @- << 'GIST_EOF'
           {
             "files": {
               "cppcheck-badge.json": {
@@ -98,5 +98,6 @@ jobs:
               }
             }
           }
+GIST_EOF
           EOF
         fi

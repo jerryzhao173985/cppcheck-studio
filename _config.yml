@@ -1,0 +1,24 @@
+# GitHub Pages configuration
+# Serve from root directory
+source: .
+# Include docs directory
+include:
+  - docs
+# Exclude unnecessary files
+exclude:
+  - node_modules
+  - "*.sh"
+  - "*.py"
+  - package.json
+  - package-lock.json
+  - tsconfig.json
+  - apps
+  - packages
+  - bin
+  - lib
+  - scripts
+  - test
+  - reports
+  - demo
+  - generate
+  - templates
