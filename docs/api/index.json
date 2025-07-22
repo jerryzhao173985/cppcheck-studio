@@ -1,2 +1,13 @@
 {"analyses":[
+{
+  "analysis_id": "1753190844151-syu10j9pz",
+  "repository": "jerryzhao173985/lpz",
+  "branch": "main",
+  "commit": "0558d22",
+  "timestamp": "2025-07-22T13:29:02Z",
+  "files_analyzed": 500,
+  "issues_found": 1160,
+  "max_files": 500,
+  "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/1753190844151-syu10j9pz/dashboard.html"
+}
 ]}
