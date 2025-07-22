@@ -1,0 +1,77 @@
+name: Update Analysis Results
+
+on:
+  workflow_run:
+    workflows: ["On-Demand Repository Analysis"]
+    types:
+      - completed
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Download analysis artifacts
+      if: github.event.workflow_run
+      uses: actions/download-artifact@v4
+      with:
+        name: analysis-${{ github.event.workflow_run.id }}
+        path: temp-results/
+      continue-on-error: true
+        
+    - name: Update analysis results
+      run: |
+        # Find the analysis record
+        RUN_ID="${{ github.event.workflow_run.id }}"
+        ANALYSIS_FILE=$(grep -l "\"runId\": \"${RUN_ID}\"" data/analyses/*.json | head -1)
+        
+        if [ -f "$ANALYSIS_FILE" ]; then
+          echo "Updating analysis: $ANALYSIS_FILE"
+          
+          # Extract metadata
+          if [ -f "temp-results/metadata.json" ]; then
+            ISSUES=$(jq -r '.issues_found' temp-results/metadata.json)
+            FILES=$(jq -r '.files_analyzed' temp-results/metadata.json)
+            REPO=$(jq -r '.repository' temp-results/metadata.json)
+            
+            # Update the analysis record
+            jq --arg status "completed" \
+               --arg issues "$ISSUES" \
+               --arg files "$FILES" \
+               '.status = $status | .issuesFound = ($issues | tonumber) | .filesAnalyzed = ($files | tonumber)' \
+               "$ANALYSIS_FILE" > temp.json && mv temp.json "$ANALYSIS_FILE"
+          else
+            # Mark as completed even without metadata
+            jq '.status = "completed"' "$ANALYSIS_FILE" > temp.json && mv temp.json "$ANALYSIS_FILE"
+          fi
+          
+          # Copy dashboard if exists
+          if [ -f "temp-results/dashboard-*.html" ]; then
+            DASHBOARD=$(ls temp-results/dashboard-*.html | head -1)
+            ANALYSIS_ID=$(basename "$ANALYSIS_FILE" .json)
+            mkdir -p docs/results
+            cp "$DASHBOARD" "docs/results/${ANALYSIS_ID}.html"
+          fi
+          
+          # Commit updates
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add -A
+          git commit -m "Update analysis results for run ${RUN_ID}" || echo "No changes"
+          git push || echo "Nothing to push"
+        fi
+        
+    - name: Trigger pages deployment
+      if: github.event.workflow_run
+      run: |
+        gh workflow run deploy-docs.yml

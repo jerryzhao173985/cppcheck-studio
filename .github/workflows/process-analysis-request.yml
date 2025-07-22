@@ -1,0 +1,117 @@
+name: Process Analysis Request
+
+on:
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: 'Repository to analyze'
+        required: true
+        type: string
+  schedule:
+    - cron: '*/5 * * * *'  # Every 5 minutes
+
+permissions:
+  contents: write
+  actions: write
+  pages: write
+  id-token: write
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Process request
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        REPO="${{ github.event.inputs.repository }}"
+        
+        if [ -z "$REPO" ]; then
+          # Check for pending requests in data/requests/
+          if [ -d "data/requests" ]; then
+            for request in data/requests/*.json; do
+              if [ -f "$request" ]; then
+                REPO=$(jq -r '.repository' "$request")
+                REQUEST_ID=$(basename "$request" .json)
+                echo "Processing request: $REQUEST_ID for $REPO"
+                
+                # Move to processing
+                mkdir -p data/processing
+                mv "$request" "data/processing/$REQUEST_ID.json"
+                
+                # Trigger analysis
+                gh workflow run analyze-on-demand.yml \
+                  -f repository="$REPO" \
+                  -f branch="main" \
+                  -f max_files=500
+                
+                # Get run ID
+                sleep 5
+                RUN_ID=$(gh run list --workflow=analyze-on-demand.yml --limit 1 --json databaseId -q '.[0].databaseId')
+                
+                # Create analysis record
+                mkdir -p docs/api/analyses
+                cat > "docs/api/analyses/$REQUEST_ID.json" << EOF
+        {
+          "id": "$REQUEST_ID",
+          "repository": "$REPO",
+          "status": "running",
+          "runId": "$RUN_ID",
+          "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        }
+        EOF
+                
+                # Only process one per run
+                break
+              fi
+            done
+          fi
+        else
+          # Direct workflow dispatch
+          REQUEST_ID="$(date +%s)-$(echo $RANDOM)"
+          
+          # Trigger analysis
+          gh workflow run analyze-on-demand.yml \
+            -f repository="$REPO" \
+            -f branch="main" \
+            -f max_files=500
+          
+          # Create analysis record
+          mkdir -p docs/api/analyses
+          cat > "docs/api/analyses/$REQUEST_ID.json" << EOF
+        {
+          "id": "$REQUEST_ID",
+          "repository": "$REPO",
+          "status": "triggered",
+          "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        }
+        EOF
+        fi
+        
+        # Update index
+        mkdir -p docs/api
+        echo '{"analyses":[' > docs/api/index.json
+        first=true
+        for analysis in docs/api/analyses/*.json; do
+          if [ -f "$analysis" ]; then
+            if [ "$first" = true ]; then
+              first=false
+            else
+              echo "," >> docs/api/index.json
+            fi
+            cat "$analysis" >> docs/api/index.json
+          fi
+        done
+        echo ']}' >> docs/api/index.json
+        
+        # Commit changes
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        git add -A
+        git commit -m "Process analysis request for ${REPO:-scheduled}" || echo "No changes"
+        git push || echo "No changes to push"

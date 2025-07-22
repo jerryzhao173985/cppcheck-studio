@@ -512,6 +512,7 @@
     </footer>
 
     <script src="cppcheck-client.js"></script>
+    <script src="simple-trigger.js"></script>
     <script>
         // Initialize CPPCheck client
         const cppcheckClient = new CPPCheckClient({
@@ -575,14 +576,115 @@
                 return;
             }
             
-            // Show instructions for triggering analysis
-            showStatus('info', `Repository: ${repo}`);
+            showStatus('info', `🔄 Starting analysis for ${repo}...`);
             
-            // Add to history
-            addToHistory(repo);
+            try {
+                // Use the simple trigger to start analysis
+                const trigger = new SimpleTrigger();
+                const result = await trigger.triggerAnalysis(repo);
+                
+                if (result.success) {
+                    // Add to history with analysis ID
+                    addToHistory(repo, { analysisId: result.analysisId });
+                    
+                    // Show success and open workflow page
+                    showStatus('success', `✅ Analysis queued for ${repo}!`);
+                    
+                    // Show modal with direct link to trigger
+                    showSimpleTriggerModal(repo, result);
+                    
+                    // Start polling for status
+                    pollAnalysisStatus(result.analysisId);
+                } else {
+                    showError('Failed to queue analysis');
+                }
+            } catch (error) {
+                showError(`Error: ${error.message}`);
+            }
+        }
+        
+        function showSimpleTriggerModal(repo, result) {
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'flex';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 600px;">
+                    <h3 class="modal-title">🚀 Complete Your Analysis</h3>
+                    
+                    <p style="margin: 20px 0;">Your analysis has been queued! Click below to trigger it:</p>
+                    
+                    <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                        <a href="${result.dispatchUrl}" 
+                           target="_blank" 
+                           class="analyze-btn" 
+                           style="display: inline-flex; margin-bottom: 15px;">
+                            <span>🎯</span>
+                            <span>Trigger Analysis on GitHub</span>
+                        </a>
+                        
+                        <ol style="margin: 10px 0; padding-left: 20px; color: #4b5563;">
+                            ${result.instructions.map(step => `<li style="margin: 5px 0;">${step}</li>`).join('')}
+                        </ol>
+                    </div>
+                    
+                    <p style="color: #666; font-size: 0.9em;">
+                        Analysis ID: <code style="background: #e5e7eb; padding: 2px 6px; border-radius: 3px;">${result.analysisId}</code>
+                    </p>
+                    
+                    <div style="text-align: center; margin-top: 30px;">
+                        <button class="btn-secondary" onclick="this.closest('.modal').remove()" style="margin-right: 10px;">Close</button>
+                        <a href="${result.dispatchUrl}" target="_blank" class="analyze-btn" style="display: inline-flex;">
+                            <span>🔗</span>
+                            <span>Go to Workflow</span>
+                        </a>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
             
-            // Show instructions modal
-            showAnalysisInstructions(repo);
+            // Close on click outside
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.remove();
+                }
+            });
+        }
+        
+        async function pollAnalysisStatus(analysisId) {
+            const proxy = new TriggerProxy();
+            let attempts = 0;
+            
+            const poll = async () => {
+                attempts++;
+                const status = await proxy.getAnalysisStatus(analysisId);
+                
+                // Update history with latest status
+                updateHistoryStatus(analysisId, status);
+                
+                if (status.status === 'completed') {
+                    showStatus('success', '✅ Analysis completed!');
+                    loadHistory(); // Refresh the display
+                } else if (attempts < 60) { // Poll for up to 5 minutes
+                    setTimeout(poll, 5000); // Check every 5 seconds
+                }
+            };
+            
+            // Start polling after a delay
+            setTimeout(poll, 10000);
+        }
+        
+        function updateHistoryStatus(analysisId, status) {
+            const history = JSON.parse(localStorage.getItem('cppcheck-history') || '[]');
+            const index = history.findIndex(h => h.options && h.options.analysisId === analysisId);
+            
+            if (index >= 0) {
+                history[index].status = status.status;
+                if (status.issuesFound !== undefined) {
+                    history[index].issues = status.issuesFound;
+                    history[index].files = status.filesAnalyzed;
+                }
+                localStorage.setItem('cppcheck-history', JSON.stringify(history));
+            }
         }
         
         function showAnalysisInstructions(repo) {
@@ -712,6 +814,17 @@ gh workflow run analyze-on-demand.yml \\
                 const timeStr = item.timestamp === 'Just now' ? item.timestamp : 
                     new Date(item.timestamp).toLocaleString();
                 
+                let statusBadge = '';
+                if (item.status === 'triggered') {
+                    statusBadge = '<span class="stat-badge badge-warning">⏳ Queued</span>';
+                } else if (item.status === 'running') {
+                    statusBadge = '<span class="stat-badge badge-info">🔄 Running...</span>';
+                } else if (item.status === 'analyzing') {
+                    statusBadge = '<span class="stat-badge badge-info">🔍 Analyzing...</span>';
+                } else if (item.status === 'completed' && item.issues) {
+                    statusBadge = `<span class="stat-badge badge-info">${item.issues} issues</span>`;
+                }
+                
                 return `
                     <div class="history-card" onclick="viewAnalysis('${item.repo}')">
                         <div class="history-repo">${item.repo}</div>
@@ -719,7 +832,7 @@ gh workflow run analyze-on-demand.yml \\
                             ${item.issues ? `<span class="stat-badge badge-info">${item.issues} issues</span>` : ''}
                             ${item.errors ? `<span class="stat-badge badge-error">${item.errors} errors</span>` : ''}
                             ${item.warnings ? `<span class="stat-badge badge-warning">${item.warnings} warnings</span>` : ''}
-                            ${item.status === 'analyzing' ? '<span class="stat-badge badge-info">🔄 Analyzing...</span>' : ''}
+                            ${statusBadge}
                         </div>
                         <div class="history-time">${timeStr}</div>
                     </div>

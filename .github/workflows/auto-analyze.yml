@@ -1,0 +1,46 @@
+name: Auto-Analyze Repositories
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'  # Every 10 minutes
+  workflow_dispatch:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: read
+  actions: write
+
+jobs:
+  check-requests:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check for analysis requests
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        # Look for recent issues that request analysis
+        ISSUES=$(gh issue list -R ${{ github.repository }} --label "analysis-request" --state open --limit 10 --json title,body,number)
+        
+        echo "$ISSUES" | jq -c '.[]' | while read -r issue; do
+          TITLE=$(echo "$issue" | jq -r '.title')
+          BODY=$(echo "$issue" | jq -r '.body')
+          NUMBER=$(echo "$issue" | jq -r '.number')
+          
+          # Extract repository from title or body
+          if [[ "$TITLE" =~ Analyze[[:space:]]+(.*) ]]; then
+            REPO="${BASH_REMATCH[1]}"
+            echo "Found analysis request for: $REPO"
+            
+            # Trigger the analysis
+            gh workflow run analyze-on-demand.yml \
+              -R ${{ github.repository }} \
+              -f repository="$REPO" \
+              -f branch="main" \
+              -f max_files=500
+            
+            # Close the issue
+            gh issue close $NUMBER -R ${{ github.repository }} -c "Analysis triggered for $REPO"
+          fi
+        done
