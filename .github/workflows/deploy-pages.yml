@@ -7,7 +7,7 @@ on:
         description: 'Repository to analyze (default: this repo)'
         required: false
         type: string
-        default: 'jerryzhao173985/cppcheck-studio'
+        default: ''
   push:
     branches: [ main ]
 
@@ -48,28 +48,34 @@ jobs:
 
     - name: Analyze repository
       run: |
+        # Create working directory
+        mkdir -p work
+        cd work
+        
         # Determine which repo to analyze
-        if [ -n "${{ github.event.inputs.repository }}" ]; then
-          echo "Cloning ${{ github.event.inputs.repository }}..."
+        if [ -n "${{ github.event.inputs.repository }}" ] && [ "${{ github.event.inputs.repository }}" != "jerryzhao173985/cppcheck-studio" ]; then
+          echo "Cloning external repository: ${{ github.event.inputs.repository }}..."
           git clone --depth 1 https://github.com/${{ github.event.inputs.repository }}.git target-repo
           cd target-repo
+          TARGET_DIR="."
         else
           echo "Analyzing current repository..."
-          cd .
+          cd ..
+          TARGET_DIR="."
         fi
         
         # Find C++ files (limit to 500 for Pages deployment)
-        find . -type f \( -name "*.cpp" -o -name "*.cc" -o -name "*.h" -o -name "*.hpp" \) \
+        find ${TARGET_DIR} -type f \( -name "*.cpp" -o -name "*.cc" -o -name "*.h" -o -name "*.hpp" \) \
           -not -path "*/node_modules/*" \
           -not -path "*/.git/*" \
+          -not -path "*/work/*" \
           | head -500 > cpp_files.txt
         
         FILE_COUNT=$(wc -l < cpp_files.txt)
         echo "Found ${FILE_COUNT} C++ files"
         
         if [ ${FILE_COUNT} -eq 0 ]; then
-          echo "No C++ files found, creating demo dashboard..."
-          # Create a demo file
+          echo "No C++ files found, creating demo..."
           mkdir -p demo
           cat > demo/example.cpp << 'EOF'
         #include <iostream>
@@ -80,10 +86,19 @@ jobs:
             std::cout << uninit;  // Uninitialized variable
         }
         EOF
-          find demo -name "*.cpp" > cpp_files.txt
+          echo "demo/example.cpp" > cpp_files.txt
+          FILE_COUNT=1
+        fi
+        
+        # Always go back to work directory for consistent paths
+        if [ -n "${{ github.event.inputs.repository }}" ] && [ "${{ github.event.inputs.repository }}" != "jerryzhao173985/cppcheck-studio" ]; then
+          cd ../../work
+        else
+          cd work
         fi
         
         # Run cppcheck
+        echo "Running CPPCheck analysis..."
         cppcheck \
           --enable=all \
           --suppress=missingIncludeSystem \
@@ -91,16 +106,19 @@ jobs:
           --xml \
           --xml-version=2 \
           --file-list=cpp_files.txt \
-          2> ../cppcheck-results.xml || true
-        
-        cd ..
+          2> cppcheck-results.xml || true
         
         # Convert to JSON
-        python3 xml2json-simple.py cppcheck-results.xml > analysis.json
+        python3 ../xml2json-simple.py cppcheck-results.xml > analysis.json
         
-        # Get stats
+        # Get stats  
         ISSUE_COUNT=$(python3 -c "import json; print(len(json.load(open('analysis.json'))['issues']))")
         echo "ISSUE_COUNT=${ISSUE_COUNT}" >> $GITHUB_ENV
+        echo "FILE_COUNT=${FILE_COUNT}" >> $GITHUB_ENV
+        
+        # Move results to root
+        mv analysis.json ../
+        cd ..
 
     - name: Generate dashboard site
       run: |
@@ -109,7 +127,7 @@ jobs:
         
         # Generate main dashboard
         cd cppcheck-dashboard-generator
-        npx tsx src/cli.ts ../analysis.json ../site/index.html \
+        npx tsx src/cli.ts ../analysis.json ../site/dashboard.html \
           --title "CPPCheck Analysis Dashboard" \
           --project "Live Analysis Results"
         cd ..
@@ -117,14 +135,14 @@ jobs:
         # Generate summary
         python3 scripts/generate-summary.py analysis.json > site/summary.txt
         
-        # Create landing page with live stats
-        cat > site/dashboard.html << 'EOF'
+        # Create enhanced landing page
+        cat > site/index.html << 'EOF'
         <!DOCTYPE html>
         <html lang="en">
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>CPPCheck Studio - Live Analysis</title>
+            <title>CPPCheck Studio - Live Dashboard</title>
             <style>
                 body { 
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -231,6 +249,20 @@ jobs:
                     margin-top: 40px;
                     font-size: 0.9em;
                 }
+                .summary-box {
+                    background: white;
+                    border-radius: 10px;
+                    padding: 30px;
+                    margin: 40px 0;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+                }
+                .summary-box pre {
+                    background: #f5f7fa;
+                    padding: 20px;
+                    border-radius: 5px;
+                    overflow-x: auto;
+                    margin: 0;
+                }
             </style>
         </head>
         <body>
@@ -250,13 +282,13 @@ jobs:
                         <div class="stat-label">Files Analyzed</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-number">REPO_PLACEHOLDER</div>
-                        <div class="stat-label">Repository</div>
+                        <div class="stat-number">TIMESTAMP_PLACEHOLDER</div>
+                        <div class="stat-label">Last Updated</div>
                     </div>
                 </div>
                 
                 <div style="text-align: center;">
-                    <a href="index.html" class="cta-button">
+                    <a href="dashboard.html" class="cta-button">
                         📊 View Interactive Dashboard
                     </a>
                     <a href="https://github.com/jerryzhao173985/cppcheck-studio" class="cta-button secondary">
@@ -265,6 +297,11 @@ jobs:
                         </svg>
                         GitHub Repository
                     </a>
+                </div>
+                
+                <div class="summary-box">
+                    <h2>Analysis Summary</h2>
+                    <pre>SUMMARY_PLACEHOLDER</pre>
                 </div>
                 
                 <div class="features">
@@ -286,7 +323,7 @@ jobs:
                 </div>
                 
                 <div class="timestamp">
-                    Last updated: TIMESTAMP_PLACEHOLDER
+                    Updated every push to main branch
                 </div>
             </div>
         </body>
@@ -294,33 +331,18 @@ jobs:
         EOF
         
         # Replace placeholders
-        REPO_NAME="${{ github.event.inputs.repository }}"
-        if [ -z "$REPO_NAME" ]; then
-          REPO_NAME="This Repository"
-        fi
+        TIMESTAMP=$(date '+%Y-%m-%d %H:%M')
+        SUMMARY=$(cat site/summary.txt)
         
-        FILE_COUNT=$(wc -l < cpp_files.txt)
-        TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S UTC')
+        # Use perl for cross-platform compatibility
+        perl -i -pe "s/ISSUE_COUNT_PLACEHOLDER/${ISSUE_COUNT}/g" site/index.html
+        perl -i -pe "s/FILE_COUNT_PLACEHOLDER/${FILE_COUNT}/g" site/index.html
+        perl -i -pe "s/TIMESTAMP_PLACEHOLDER/${TIMESTAMP}/g" site/index.html
         
-        sed -i.bak "s/ISSUE_COUNT_PLACEHOLDER/${ISSUE_COUNT}/g" site/dashboard.html
-        sed -i.bak "s/FILE_COUNT_PLACEHOLDER/${FILE_COUNT}/g" site/dashboard.html
-        sed -i.bak "s/REPO_PLACEHOLDER/${REPO_NAME}/g" site/dashboard.html
-        sed -i.bak "s/TIMESTAMP_PLACEHOLDER/${TIMESTAMP}/g" site/dashboard.html
-        rm site/dashboard.html.bak
-        
-        # Move dashboard.html to index for root page
-        mv site/dashboard.html site/landing.html
-        mv site/index.html site/dashboard.html
-        
-        # Create new index that redirects or shows landing
-        cat > site/index.html << 'EOF'
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta http-equiv="refresh" content="0; url=landing.html">
-        </head>
-        </html>
-        EOF
+        # Handle multi-line summary replacement
+        echo "$SUMMARY" > temp_summary.txt
+        perl -i -pe 'BEGIN{undef $/; open(F,"temp_summary.txt"); $summary=<F>; close(F)} s/SUMMARY_PLACEHOLDER/$summary/g' site/index.html
+        rm temp_summary.txt
 
     - name: Setup Pages
       uses: actions/configure-pages@v4
