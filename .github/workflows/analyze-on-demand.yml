@@ -1,0 +1,212 @@
+name: On-Demand Repository Analysis
+
+on:
+  repository_dispatch:
+    types: [analyze-repo]
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: 'GitHub repository to analyze (owner/repo)'
+        required: true
+        type: string
+      branch:
+        description: 'Branch to analyze'
+        required: false
+        type: string
+        default: 'main'
+      max_files:
+        description: 'Maximum files to analyze'
+        required: false
+        type: number
+        default: 500
+      callback_url:
+        description: 'URL to POST results to when complete'
+        required: false
+        type: string
+
+jobs:
+  analyze:
+    name: Analyze C++ Repository
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Parse inputs
+      run: |
+        # Handle both workflow_dispatch and repository_dispatch
+        if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+          echo "REPO=${{ github.event.client_payload.repository }}" >> $GITHUB_ENV
+          echo "BRANCH=${{ github.event.client_payload.branch || 'main' }}" >> $GITHUB_ENV
+          echo "MAX_FILES=${{ github.event.client_payload.max_files || 500 }}" >> $GITHUB_ENV
+          echo "CALLBACK_URL=${{ github.event.client_payload.callback_url }}" >> $GITHUB_ENV
+        else
+          echo "REPO=${{ github.event.inputs.repository }}" >> $GITHUB_ENV
+          echo "BRANCH=${{ github.event.inputs.branch }}" >> $GITHUB_ENV
+          echo "MAX_FILES=${{ github.event.inputs.max_files }}" >> $GITHUB_ENV
+          echo "CALLBACK_URL=${{ github.event.inputs.callback_url }}" >> $GITHUB_ENV
+        fi
+        
+        # Generate unique ID for this analysis
+        echo "ANALYSIS_ID=$(date +%s)-$(echo $RANDOM)" >> $GITHUB_ENV
+
+    - name: Checkout CPPCheck Studio
+      uses: actions/checkout@v4
+      with:
+        path: cppcheck-studio
+
+    - name: Setup environment
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cppcheck
+        
+        cd cppcheck-studio/cppcheck-dashboard-generator
+        npm ci
+        npm run build
+        sudo npm link -g
+        cd ../..
+
+    - name: Clone and analyze repository
+      run: |
+        echo "🔍 Analyzing repository: ${{ env.REPO }}"
+        echo "📌 Branch: ${{ env.BRANCH }}"
+        echo "📄 Max files: ${{ env.MAX_FILES }}"
+        
+        # Clone target repository
+        git clone --depth 1 --branch ${{ env.BRANCH }} \
+          https://github.com/${{ env.REPO }}.git target-repo || {
+          echo "Failed to clone repository"
+          exit 1
+        }
+        
+        cd target-repo
+        COMMIT_SHA=$(git rev-parse --short HEAD)
+        echo "COMMIT_SHA=${COMMIT_SHA}" >> $GITHUB_ENV
+        
+        # Find C++ files
+        find . -type f \( -name "*.cpp" -o -name "*.cc" -o -name "*.cxx" -o -name "*.c" -o -name "*.h" -o -name "*.hpp" \) \
+          -not -path "*/build/*" \
+          -not -path "*/.git/*" \
+          -not -path "*/vendor/*" \
+          -not -path "*/third_party/*" \
+          | head -n ${{ env.MAX_FILES }} > cpp_files.txt
+        
+        FILE_COUNT=$(wc -l < cpp_files.txt)
+        echo "FILE_COUNT=${FILE_COUNT}" >> $GITHUB_ENV
+        
+        if [ ${FILE_COUNT} -eq 0 ]; then
+          echo "❌ No C++ files found in repository"
+          exit 1
+        fi
+        
+        echo "✅ Found ${FILE_COUNT} C++ files to analyze"
+        
+        # Run cppcheck
+        cppcheck \
+          --enable=all \
+          --inconclusive \
+          --suppress=missingIncludeSystem \
+          --std=c++17 \
+          --xml \
+          --xml-version=2 \
+          --file-list=cpp_files.txt \
+          -j $(nproc) \
+          2> ../cppcheck-results.xml || true
+        
+        cd ..
+        
+        # Convert to JSON
+        python3 cppcheck-studio/xml2json-simple.py cppcheck-results.xml > analysis.json
+        
+        # Get issue count
+        ISSUE_COUNT=$(python3 -c "import json; print(len(json.load(open('analysis.json'))['issues']))")
+        echo "ISSUE_COUNT=${ISSUE_COUNT}" >> $GITHUB_ENV
+        
+        # Add code context
+        cd target-repo
+        python3 ../cppcheck-studio/add-code-context.py ../analysis.json ../analysis-with-context.json
+        cd ..
+
+    - name: Generate dashboard
+      run: |
+        # Create output directory
+        mkdir -p output
+        
+        # Generate dashboard
+        PROJECT_NAME="${{ env.REPO }}"
+        cppcheck-dashboard \
+          analysis-with-context.json \
+          output/dashboard-${{ env.ANALYSIS_ID }}.html \
+          --title "${PROJECT_NAME} Analysis" \
+          --project "${PROJECT_NAME} (${{ env.COMMIT_SHA }})"
+        
+        # Generate summary
+        python3 cppcheck-studio/scripts/generate-summary.py analysis.json > output/summary.txt
+        
+        # Generate detailed report
+        python3 cppcheck-studio/scripts/generate-detailed-report.py analysis.json > output/report.md
+        
+        # Create metadata
+        cat > output/metadata.json << EOF
+        {
+          "analysis_id": "${{ env.ANALYSIS_ID }}",
+          "repository": "${{ env.REPO }}",
+          "branch": "${{ env.BRANCH }}",
+          "commit": "${{ env.COMMIT_SHA }}",
+          "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "files_analyzed": ${{ env.FILE_COUNT }},
+          "issues_found": ${{ env.ISSUE_COUNT }},
+          "max_files": ${{ env.MAX_FILES }},
+          "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/${{ env.ANALYSIS_ID }}/dashboard.html"
+        }
+        EOF
+
+    - name: Upload results as artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: analysis-${{ env.ANALYSIS_ID }}
+        path: |
+          output/dashboard-*.html
+          output/summary.txt
+          output/report.md
+          output/metadata.json
+          analysis.json
+
+    - name: Deploy to GitHub Pages results directory
+      if: github.ref == 'refs/heads/main'
+      run: |
+        # This would deploy to a results subdirectory
+        # In production, you'd set up proper deployment
+        echo "Results would be deployed to: https://jerryzhao173985.github.io/cppcheck-studio/results/${{ env.ANALYSIS_ID }}/"
+
+    - name: Send callback if provided
+      if: env.CALLBACK_URL != ''
+      run: |
+        # Send results to callback URL
+        curl -X POST ${{ env.CALLBACK_URL }} \
+          -H "Content-Type: application/json" \
+          -d @output/metadata.json \
+          || echo "Failed to send callback"
+
+    - name: Create job summary
+      run: |
+        echo "# 🔍 Analysis Complete: ${{ env.REPO }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## 📊 Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- **Repository:** [${{ env.REPO }}](https://github.com/${{ env.REPO }})" >> $GITHUB_STEP_SUMMARY
+        echo "- **Branch:** ${{ env.BRANCH }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit:** ${{ env.COMMIT_SHA }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Files Analyzed:** ${{ env.FILE_COUNT }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Issues Found:** ${{ env.ISSUE_COUNT }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## 📈 Results" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        cat output/summary.txt >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## 🎯 Next Steps" >> $GITHUB_STEP_SUMMARY
+        echo "1. [Download the full dashboard](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts)" >> $GITHUB_STEP_SUMMARY
+        echo "2. Analysis ID: \`${{ env.ANALYSIS_ID }}\`" >> $GITHUB_STEP_SUMMARY

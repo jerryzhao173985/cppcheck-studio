@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CPPCheck Studio - Analysis Gallery</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f5f7fa;
+            color: #333;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin: 0;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        
+        .filters {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .search-box {
+            flex: 1;
+            min-width: 200px;
+            padding: 10px 15px;
+            border: 1px solid #e1e4e8;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+        
+        .filter-btn {
+            padding: 10px 20px;
+            background: #f3f4f6;
+            border: 1px solid #e1e4e8;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .filter-btn:hover {
+            background: #e5e7eb;
+        }
+        
+        .filter-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 25px;
+        }
+        
+        .analysis-card {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        
+        .analysis-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .card-header {
+            padding: 20px;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        
+        .repo-name {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        
+        .repo-meta {
+            display: flex;
+            gap: 15px;
+            font-size: 0.85em;
+            color: #666;
+        }
+        
+        .card-stats {
+            padding: 20px;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+        
+        .stat {
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            font-size: 0.85em;
+            color: #666;
+        }
+        
+        .card-chart {
+            height: 80px;
+            padding: 0 20px 20px;
+            display: flex;
+            align-items: flex-end;
+            gap: 5px;
+        }
+        
+        .chart-bar {
+            flex: 1;
+            background: #e5e7eb;
+            border-radius: 3px 3px 0 0;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .chart-bar-fill {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            transition: height 0.3s;
+        }
+        
+        .bar-error { background: #ef4444; }
+        .bar-warning { background: #f59e0b; }
+        .bar-style { background: #3b82f6; }
+        .bar-performance { background: #10b981; }
+        
+        .card-footer {
+            padding: 15px 20px;
+            background: #f9fafb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .view-btn {
+            padding: 8px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            text-decoration: none;
+            font-size: 0.9em;
+            transition: all 0.3s;
+        }
+        
+        .view-btn:hover {
+            background: #5a5fc7;
+        }
+        
+        .timestamp {
+            font-size: 0.85em;
+            color: #666;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+        
+        .empty-state h2 {
+            color: #6b7280;
+            margin-bottom: 10px;
+        }
+        
+        .empty-state p {
+            color: #9ca3af;
+        }
+        
+        /* Loading skeleton */
+        .skeleton {
+            background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+        }
+        
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        
+        .skeleton-card {
+            height: 280px;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 Analysis Gallery</h1>
+        <p>Browse all analyzed C++ repositories</p>
+    </div>
+    
+    <div class="container">
+        <div class="filters">
+            <input type="text" class="search-box" placeholder="Search repositories..." id="searchInput">
+            <button class="filter-btn active" onclick="filterByTime('all')">All Time</button>
+            <button class="filter-btn" onclick="filterByTime('today')">Today</button>
+            <button class="filter-btn" onclick="filterByTime('week')">This Week</button>
+            <button class="filter-btn" onclick="filterByTime('month')">This Month</button>
+        </div>
+        
+        <div class="gallery-grid" id="galleryGrid">
+            <!-- Loading skeletons -->
+            <div class="analysis-card skeleton skeleton-card"></div>
+            <div class="analysis-card skeleton skeleton-card"></div>
+            <div class="analysis-card skeleton skeleton-card"></div>
+        </div>
+    </div>
+    
+    <script>
+        // Sample data - in production this would come from an API
+        const sampleAnalyses = [
+            {
+                id: 'current',
+                repository: 'jerryzhao173985/cppcheck-studio',
+                branch: 'main',
+                commit: 'abc123',
+                timestamp: new Date().toISOString(),
+                filesAnalyzed: 20,
+                issues: {
+                    total: 9,
+                    error: 3,
+                    warning: 0,
+                    style: 4,
+                    performance: 0,
+                    information: 2
+                },
+                dashboardUrl: 'dashboard.html'
+            },
+            {
+                id: '1234567890',
+                repository: 'nlohmann/json',
+                branch: 'develop',
+                commit: 'def456',
+                timestamp: new Date(Date.now() - 86400000).toISOString(),
+                filesAnalyzed: 150,
+                issues: {
+                    total: 42,
+                    error: 5,
+                    warning: 12,
+                    style: 20,
+                    performance: 3,
+                    information: 2
+                },
+                dashboardUrl: '#'
+            },
+            {
+                id: '0987654321',
+                repository: 'opencv/opencv',
+                branch: 'main',
+                commit: 'ghi789',
+                timestamp: new Date(Date.now() - 172800000).toISOString(),
+                filesAnalyzed: 500,
+                issues: {
+                    total: 234,
+                    error: 45,
+                    warning: 67,
+                    style: 89,
+                    performance: 23,
+                    information: 10
+                },
+                dashboardUrl: '#'
+            },
+            {
+                id: '1357924680',
+                repository: 'pytorch/pytorch',
+                branch: 'master',
+                commit: 'jkl012',
+                timestamp: new Date(Date.now() - 259200000).toISOString(),
+                filesAnalyzed: 500,
+                issues: {
+                    total: 156,
+                    error: 23,
+                    warning: 45,
+                    style: 67,
+                    performance: 15,
+                    information: 6
+                },
+                dashboardUrl: '#'
+            }
+        ];
+        
+        let currentFilter = 'all';
+        let searchTerm = '';
+        
+        function renderGallery(analyses) {
+            const grid = document.getElementById('galleryGrid');
+            
+            if (analyses.length === 0) {
+                grid.innerHTML = `
+                    <div class="empty-state" style="grid-column: 1 / -1;">
+                        <h2>No analyses found</h2>
+                        <p>Try adjusting your filters or search terms</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            grid.innerHTML = analyses.map(analysis => {
+                const maxIssues = Math.max(
+                    analysis.issues.error,
+                    analysis.issues.warning,
+                    analysis.issues.style,
+                    analysis.issues.performance
+                );
+                
+                const chartHeight = 60;
+                
+                return `
+                    <div class="analysis-card" onclick="viewDashboard('${analysis.dashboardUrl}')">
+                        <div class="card-header">
+                            <div class="repo-name">${analysis.repository}</div>
+                            <div class="repo-meta">
+                                <span>🌿 ${analysis.branch}</span>
+                                <span>📁 ${analysis.filesAnalyzed} files</span>
+                            </div>
+                        </div>
+                        
+                        <div class="card-stats">
+                            <div class="stat">
+                                <div class="stat-value">${analysis.issues.total}</div>
+                                <div class="stat-label">Total Issues</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value">${analysis.issues.error}</div>
+                                <div class="stat-label">Errors</div>
+                            </div>
+                        </div>
+                        
+                        <div class="card-chart">
+                            <div class="chart-bar" title="Errors: ${analysis.issues.error}">
+                                <div class="chart-bar-fill bar-error" 
+                                     style="height: ${(analysis.issues.error / maxIssues) * chartHeight}px">
+                                </div>
+                            </div>
+                            <div class="chart-bar" title="Warnings: ${analysis.issues.warning}">
+                                <div class="chart-bar-fill bar-warning" 
+                                     style="height: ${(analysis.issues.warning / maxIssues) * chartHeight}px">
+                                </div>
+                            </div>
+                            <div class="chart-bar" title="Style: ${analysis.issues.style}">
+                                <div class="chart-bar-fill bar-style" 
+                                     style="height: ${(analysis.issues.style / maxIssues) * chartHeight}px">
+                                </div>
+                            </div>
+                            <div class="chart-bar" title="Performance: ${analysis.issues.performance}">
+                                <div class="chart-bar-fill bar-performance" 
+                                     style="height: ${(analysis.issues.performance / maxIssues) * chartHeight}px">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card-footer">
+                            <span class="timestamp">${formatTime(analysis.timestamp)}</span>
+                            <a href="${analysis.dashboardUrl}" class="view-btn" onclick="event.stopPropagation()">
+                                View Dashboard →
+                            </a>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function formatTime(timestamp) {
+            const date = new Date(timestamp);
+            const now = new Date();
+            const diff = now - date;
+            
+            if (diff < 3600000) {
+                const mins = Math.floor(diff / 60000);
+                return `${mins} minute${mins !== 1 ? 's' : ''} ago`;
+            } else if (diff < 86400000) {
+                const hours = Math.floor(diff / 3600000);
+                return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+            } else if (diff < 604800000) {
+                const days = Math.floor(diff / 86400000);
+                return `${days} day${days !== 1 ? 's' : ''} ago`;
+            } else {
+                return date.toLocaleDateString();
+            }
+        }
+        
+        function filterByTime(period) {
+            currentFilter = period;
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            applyFilters();
+        }
+        
+        function applyFilters() {
+            let filtered = [...sampleAnalyses];
+            
+            // Apply time filter
+            if (currentFilter !== 'all') {
+                const now = new Date();
+                const cutoff = new Date();
+                
+                switch (currentFilter) {
+                    case 'today':
+                        cutoff.setHours(0, 0, 0, 0);
+                        break;
+                    case 'week':
+                        cutoff.setDate(now.getDate() - 7);
+                        break;
+                    case 'month':
+                        cutoff.setMonth(now.getMonth() - 1);
+                        break;
+                }
+                
+                filtered = filtered.filter(a => new Date(a.timestamp) >= cutoff);
+            }
+            
+            // Apply search filter
+            if (searchTerm) {
+                filtered = filtered.filter(a => 
+                    a.repository.toLowerCase().includes(searchTerm.toLowerCase())
+                );
+            }
+            
+            renderGallery(filtered);
+        }
+        
+        function viewDashboard(url) {
+            if (url === '#') {
+                alert('This is a demo. In production, this would open the actual analysis dashboard.');
+            } else {
+                window.location.href = url;
+            }
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            renderGallery(sampleAnalyses);
+            
+            // Search functionality
+            document.getElementById('searchInput').addEventListener('input', (e) => {
+                searchTerm = e.target.value;
+                applyFilters();
+            });
+        });
+    </script>
+</body>
+</html>
