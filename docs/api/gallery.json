@@ -144,6 +144,17 @@
       "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/1753213114128-x9p75wfg2/index.html"
     },
     {
+      "analysis_id": "python-enhanced-1753213079",
+      "repository": "jerryzhao173985/lpz",
+      "branch": "main",
+      "commit": "0558d22",
+      "timestamp": "2025-07-22T19:42:55Z",
+      "files_analyzed": 500,
+      "issues_found": 1160,
+      "max_files": 500,
+      "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/python-enhanced-1753213079/index.html"
+    },
+    {
       "analysis_id": "python-fix-test-1753212658",
       "repository": "jerryzhao173985/lpz",
       "branch": "main",
