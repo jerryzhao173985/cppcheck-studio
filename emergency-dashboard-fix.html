@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Emergency Dashboard Fix</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 { color: #333; }
+        .instructions {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .code {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            overflow-x: auto;
+        }
+        .button {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .button:hover {
+            background: #1976D2;
+        }
+        .success {
+            background: #4CAF50;
+        }
+        .error {
+            background: #f44336;
+        }
+        #status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 4px;
+            display: none;
+        }
+        #status.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚨 Emergency Dashboard Fix</h1>
+        
+        <div class="instructions">
+            <h2>This page will help fix your hanging dashboard</h2>
+            <p>Your dashboard is hanging at "Loading..." because of a JavaScript parsing error.</p>
+            <p>Follow these steps:</p>
+            <ol>
+                <li>Open your broken dashboard in a browser</li>
+                <li>Open the browser console (F12)</li>
+                <li>Copy and paste the fix code below into the console</li>
+                <li>Press Enter to run it</li>
+            </ol>
+        </div>
+
+        <h2>Fix Code:</h2>
+        <div class="code" id="fixCode">
+// Emergency Dashboard Fix
+(function() {
+    console.log('🚨 Running emergency dashboard fix...');
+    
+    // Override the broken split functions
+    const originalSplit = String.prototype.split;
+    String.prototype.split = function(separator) {
+        // If splitting on a newline character that appears as literal in HTML
+        if (separator === '\n' || separator === '\\n' || separator.charCodeAt(0) === 10) {
+            // Use a regex to split on actual newlines
+            return originalSplit.call(this, /\r?\n/);
+        }
+        return originalSplit.call(this, separator);
+    };
+    
+    // Force reload the embedded data
+    if (window.loadEmbeddedData) {
+        try {
+            window.loadEmbeddedData();
+            console.log('✅ Data loaded successfully');
+            
+            // Setup virtual scrolling
+            if (window.setupVirtualScroll) {
+                window.setupVirtualScroll();
+                console.log('✅ Virtual scrolling setup');
+            }
+            
+            // Filter and render
+            if (window.filterData) {
+                window.filterData();
+                console.log('✅ Data filtered and rendered');
+            }
+            
+            console.log('🎉 Dashboard should now be working!');
+        } catch (error) {
+            console.error('❌ Fix failed:', error);
+        }
+    } else {
+        console.error('❌ Dashboard functions not found. Try refreshing the page first.');
+    }
+    
+    // Restore original split function
+    String.prototype.split = originalSplit;
+})();
+        </div>
+        
+        <button class="button" onclick="copyFix()">📋 Copy Fix Code</button>
+        <button class="button success" onclick="showAlternative()">🔧 Show Alternative Fix</button>
+        
+        <div id="status"></div>
+        
+        <div id="alternativeFix" style="display: none;">
+            <h2>Alternative Fix (if the above doesn't work):</h2>
+            <div class="code">
+// Alternative: Direct data extraction and display
+(function() {
+    console.log('🔧 Running alternative fix...');
+    
+    // Get the data directly
+    const issuesScript = document.getElementById('issuesData');
+    if (!issuesScript) {
+        console.error('No issues data found!');
+        return;
+    }
+    
+    // Extract and parse JSONL manually
+    const text = issuesScript.textContent;
+    const lines = text.match(/\{[^}]+\}/g) || [];
+    console.log('Found ' + lines.length + ' potential JSON objects');
+    
+    const issues = [];
+    lines.forEach((line, i) => {
+        try {
+            const issue = JSON.parse(line);
+            issues.push(issue);
+        } catch (e) {
+            console.warn('Failed to parse line ' + i);
+        }
+    });
+    
+    console.log('Parsed ' + issues.length + ' issues');
+    
+    // Force display
+    if (window.state) {
+        window.state.allIssues = issues;
+        window.state.filteredIssues = issues;
+        window.state.containerHeight = 600;
+        
+        // Update display
+        const countEl = document.getElementById('issuesCount');
+        if (countEl) {
+            countEl.textContent = 'Showing all ' + issues.length + ' issues';
+        }
+        
+        // Force render
+        if (window.renderVisibleRows) {
+            window.renderVisibleRows();
+        }
+        
+        console.log('✅ Alternative fix applied!');
+    }
+})();
+            </div>
+            <button class="button" onclick="copyAlternative()">📋 Copy Alternative Fix</button>
+        </div>
+        
+        <h2>Permanent Solution:</h2>
+        <p>To permanently fix your dashboards, update to the latest version of cppcheck-dashboard-generator:</p>
+        <div class="code">
+npm update -g cppcheck-dashboard-generator
+# or
+npm install -g cppcheck-dashboard-generator@latest
+        </div>
+    </div>
+    
+    <script>
+        function copyFix() {
+            const code = document.getElementById('fixCode').textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                showStatus('✅ Fix code copied to clipboard!', 'success');
+            }).catch(() => {
+                showStatus('❌ Failed to copy. Please select and copy manually.', 'error');
+            });
+        }
+        
+        function copyAlternative() {
+            const code = document.querySelector('#alternativeFix .code').textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                showStatus('✅ Alternative fix copied to clipboard!', 'success');
+            }).catch(() => {
+                showStatus('❌ Failed to copy. Please select and copy manually.', 'error');
+            });
+        }
+        
+        function showAlternative() {
+            document.getElementById('alternativeFix').style.display = 'block';
+        }
+        
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = 'show ' + type;
+            setTimeout(() => {
+                status.className = '';
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

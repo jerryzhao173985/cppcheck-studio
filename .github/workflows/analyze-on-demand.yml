@@ -81,7 +81,15 @@ jobs:
         cd cppcheck-studio/cppcheck-dashboard-generator
         npm ci
         npm run build
-        sudo npm link
+        
+        # Force use the local built version
+        sudo npm link --force
+        
+        # Verify the correct version is being used
+        echo "Checking dashboard generator version..."
+        which cppcheck-dashboard
+        cppcheck-dashboard --version || echo "No version info"
+        
         cd ../..
 
     - name: Clone and analyze repository
@@ -205,12 +213,22 @@ jobs:
         
         # Generate dashboard
         PROJECT_NAME="${{ env.REPO }}"
-        cppcheck-dashboard \
-          analysis-with-context.json \
-          output/dashboard-${{ env.ANALYSIS_ID }}.html \
-          --title "${PROJECT_NAME} Analysis" \
-          --project "${PROJECT_NAME} (${{ env.COMMIT_SHA }})" \
-          --verbose
+        
+        # Check which generator to use
+        if [ -f cppcheck-studio/generate-standalone-virtual-dashboard.py ]; then
+          echo "Using Python dashboard generator for better compatibility..."
+          python3 cppcheck-studio/generate-standalone-virtual-dashboard.py \
+            analysis-with-context.json \
+            output/dashboard-${{ env.ANALYSIS_ID }}.html
+        else
+          echo "Using TypeScript dashboard generator..."
+          cppcheck-dashboard \
+            analysis-with-context.json \
+            output/dashboard-${{ env.ANALYSIS_ID }}.html \
+            --title "${PROJECT_NAME} Analysis" \
+            --project "${PROJECT_NAME} (${{ env.COMMIT_SHA }})" \
+            --verbose
+        fi
         
         # Generate summary
         python3 cppcheck-studio/scripts/generate-summary.py analysis.json > output/summary.txt
@@ -309,35 +327,58 @@ jobs:
       run: |
         DASHBOARD_URL="https://jerryzhao173985.github.io/cppcheck-studio/results/${{ env.ANALYSIS_ID }}/index.html"
         
+        # Create a prominent banner
         cat >> $GITHUB_STEP_SUMMARY << EOF
-        # 📊 CPPCheck Analysis Results
+        # 🎯 CPPCheck Analysis Complete!
         
-        ## 📋 Summary
-        - **Repository**: \`${{ env.REPO }}\`
-        - **Branch**: \`${{ env.BRANCH }}\`
-        - **Commit**: \`${{ env.COMMIT_SHA }}\`
-        - **Analysis ID**: \`${{ env.ANALYSIS_ID }}\`
+        > ### [🔗 **CLICK HERE TO VIEW YOUR INTERACTIVE DASHBOARD** →](${DASHBOARD_URL})
+        > 
+        > The dashboard includes:
+        > - **Virtual scrolling** for smooth navigation through all ${ISSUE_COUNT:-0} issues
+        > - **Code context preview** showing the exact lines where issues occur
+        > - **Real-time search and filtering** by severity, file, or message
+        > - **Detailed issue information** with line numbers and descriptions
         
-        ## 📈 Statistics
-        - **Files Analyzed**: ${{ env.FILE_COUNT || 0 }}
-        - **Issues Found**: ${{ env.ISSUE_COUNT || 0 }}
+        ---
         
-        ## 🔗 Links
-        - [🎯 **View Interactive Dashboard** →](${DASHBOARD_URL})
-        - [📊 View Workflow Details](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-        - [📁 View Analysis Artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts)
+        ## 📊 Analysis Summary
+        
+        | Property | Value |
+        |----------|-------|
+        | **Repository** | \`${{ env.REPO }}\` |
+        | **Branch** | \`${{ env.BRANCH }}\` |
+        | **Commit** | \`${{ env.COMMIT_SHA }}\` |
+        | **Analysis ID** | \`${{ env.ANALYSIS_ID }}\` |
+        | **Files Analyzed** | **${{ env.FILE_COUNT || 0 }}** |
+        | **Total Issues** | **${{ env.ISSUE_COUNT || 0 }}** |
         
         ## 📈 Issue Breakdown
         \`\`\`
         $(cat output/summary.txt 2>/dev/null || echo "Summary not available")
         \`\`\`
         
-        ## 🚀 Next Steps
-        1. Click the dashboard link above to explore all issues interactively
-        2. Use filters to focus on specific severity levels
-        3. Click on issues to see code context
-        4. Share the dashboard URL with your team
+        ## 🔗 Additional Links
+        - [📂 Download Analysis Artifacts](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts)
+        - [🔍 View Workflow Logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+        - [📊 API Status Endpoint](https://jerryzhao173985.github.io/cppcheck-studio/api/status/${{ env.ANALYSIS_ID }}.json)
+        
+        ## 💡 Dashboard Tips
+        1. **Can't see issues?** Press \`F12\` to open console, then run \`recoverDashboard()\`
+        2. **Use keyboard shortcuts**: 
+           - \`/\` to focus search
+           - \`1-5\` to filter by severity
+           - \`ESC\` to close modals
+        3. **Share the dashboard**: The URL is permanent and can be bookmarked
         
         ---
-        *Analysis completed at $(date -u +%Y-%m-%dT%H:%M:%SZ)*
+        
+        <details>
+        <summary>📝 Debug Information</summary>
+        
+        - Workflow Run: ${{ github.run_id }}
+        - Triggered by: ${{ github.event_name }}
+        - Runner: ${{ runner.os }}
+        - Analysis completed at: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+        
+        </details>
         EOF

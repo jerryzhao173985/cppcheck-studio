@@ -227,8 +227,7 @@
         }
         
         /* Virtual scroll container */
-        .virtual-scroll-container {
-            flex: 1;
+        .virtual-scroll-container {flex: 1;
             overflow-y: auto;
             background: white;
             margin: 0 20px 20px;
@@ -237,7 +236,10 @@
             max-width: 1560px;
             align-self: center;
             width: calc(100% - 40px);
-        }
+        
+        min-height: 400px;
+        height: calc(100vh - 300px);
+    }
         
         .issues-table-wrapper {
             position: relative;
@@ -6663,17 +6665,21 @@
         
         // Set up virtual scrolling
         function setupVirtualScroll() {
-            const viewport = document.getElementById('viewport');
-            const scrollContainer = document.getElementById('scrollContainer');
-            
-            // Update container height on resize
-            const updateContainerHeight = () => {
-                state.containerHeight = scrollContainer.clientHeight - 100; // Account for header
-                renderVisibleRows();
-            };
-            
-            updateContainerHeight();
-            window.addEventListener('resize', updateContainerHeight);
+        // COMPREHENSIVE FIX APPLIED
+        const viewport = document.getElementById('viewport');
+        const scrollContainer = document.getElementById('scrollContainer');
+        
+        // Update container height on resize
+        const updateContainerHeight = () => {
+            // Fix: Ensure minimum height and proper calculation
+            const rect = scrollContainer.getBoundingClientRect();
+            state.containerHeight = Math.max(400, rect.height - 100); // Minimum 400px
+            console.log('Container height updated:', state.containerHeight);
+            renderVisibleRows();
+        };
+        
+        updateContainerHeight();
+        window.addEventListener('resize', updateContainerHeight);
             
             // Handle scroll events
             scrollContainer.addEventListener('scroll', debounce(() => {
@@ -6684,12 +6690,18 @@
         
         // Render visible rows based on scroll position
         function renderVisibleRows() {
-            const totalHeight = state.filteredIssues.length * CONFIG.ROW_HEIGHT;
-            const visibleStart = Math.floor(state.scrollTop / CONFIG.ROW_HEIGHT) - CONFIG.VISIBLE_BUFFER;
-            const visibleEnd = Math.ceil((state.scrollTop + state.containerHeight) / CONFIG.ROW_HEIGHT) + CONFIG.VISIBLE_BUFFER;
-            
-            state.visibleStart = Math.max(0, visibleStart);
-            state.visibleEnd = Math.min(state.filteredIssues.length, visibleEnd);
+        // Ensure we have issues to render
+        if (!state.filteredIssues || state.filteredIssues.length === 0) {
+            console.warn('No filtered issues to render');
+            return;
+        }
+        
+        const totalHeight = state.filteredIssues.length * CONFIG.ROW_HEIGHT;
+        const visibleStart = Math.floor(state.scrollTop / CONFIG.ROW_HEIGHT) - CONFIG.VISIBLE_BUFFER;
+        const visibleEnd = Math.ceil((state.scrollTop + state.containerHeight) / CONFIG.ROW_HEIGHT) + CONFIG.VISIBLE_BUFFER;
+        
+        state.visibleStart = Math.max(0, visibleStart);
+        state.visibleEnd = Math.min(state.filteredIssues.length, visibleEnd);
             
             // Update spacers
             document.getElementById('spacerTop').style.height = (state.visibleStart * CONFIG.ROW_HEIGHT) + 'px';
@@ -6961,6 +6973,37 @@
         } else {
             initialize();
         }
+    
+    // Auto-recovery mechanism
+    setTimeout(() => {
+        if (state.filteredIssues.length > 0 && document.getElementById('issuesBody').children.length === 0) {
+            console.warn('⚠️ No rows rendered, forcing recovery...');
+            state.containerHeight = 600; // Force reasonable height
+            renderVisibleRows();
+        }
+    }, 500);
+    
+    // Manual recovery function
+    window.recoverDashboard = function() {
+        console.log('🔧 Running dashboard recovery...');
+        
+        // Reset state
+        state.scrollTop = 0;
+        state.visibleStart = 0;
+        state.visibleEnd = 50;
+        state.containerHeight = document.getElementById('scrollContainer').clientHeight || 600;
+        
+        // Re-filter and render
+        filterData();
+        renderVisibleRows();
+        
+        // Scroll to top
+        document.getElementById('scrollContainer').scrollTop = 0;
+        
+        console.log('✅ Recovery complete');
+        console.log('Issues to render:', state.filteredIssues.length);
+        console.log('Rows rendered:', document.getElementById('issuesBody').children.length);
+    };
     </script>
 </body>
 </html>

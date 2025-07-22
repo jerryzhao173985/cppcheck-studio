@@ -44,16 +44,36 @@ export function generateScripts(): string {
             filterData();
             console.log('🎯 Filtered ' + state.filteredIssues.length + ' issues');
             
-            // Ensure initial render happens
-            setTimeout(() => {
+            // Multiple recovery attempts to ensure rendering
+            const attemptRender = (attempt = 1) => {
                 renderVisibleRows();
-                // Auto-recovery check
-                if (state.filteredIssues.length > 0 && document.getElementById('issuesBody').children.length === 0) {
-                    console.warn('⚠️ No rows rendered, attempting recovery...');
-                    state.containerHeight = document.getElementById('scrollContainer').clientHeight || 600;
-                    renderVisibleRows();
+                const tbody = document.getElementById('issuesBody');
+                
+                if (state.filteredIssues.length > 0 && tbody && tbody.children.length === 0) {
+                    console.warn(\`⚠️ Attempt \${attempt}: No rows rendered, retrying...\`);
+                    
+                    // Force container height recalculation
+                    const scrollContainer = document.getElementById('scrollContainer');
+                    if (scrollContainer) {
+                        const rect = scrollContainer.getBoundingClientRect();
+                        state.containerHeight = Math.max(400, rect.height || 600);
+                        console.log('Recalculated container height:', state.containerHeight);
+                    }
+                    
+                    if (attempt < 3) {
+                        setTimeout(() => attemptRender(attempt + 1), 200 * attempt);
+                    } else {
+                        console.error('❌ Failed to render after 3 attempts');
+                        // Force manual recovery
+                        window.recoverDashboard();
+                    }
+                } else if (tbody && tbody.children.length > 0) {
+                    console.log('✅ Successfully rendered ' + tbody.children.length + ' rows');
                 }
-            }, 100);
+            };
+            
+            // Start render attempts after DOM settles
+            setTimeout(() => attemptRender(), 100);
             
             hideLoadingStatus();
         } catch (error) {
@@ -68,7 +88,7 @@ export function generateScripts(): string {
             // Parse issues data
             const issuesScript = document.getElementById('issuesData');
             const issuesText = issuesScript.textContent.trim();
-            const issuesLines = issuesText.split('\n').filter(line => line.trim());
+            const issuesLines = issuesText.split('__NEWLINE__').filter(line => line.trim());
             
             state.allIssues = issuesLines.map(line => {
                 try {
@@ -84,7 +104,7 @@ export function generateScripts(): string {
             // Parse code context data
             const codeScript = document.getElementById('codeContextData');
             const codeText = codeScript.textContent.trim();
-            const codeLines = codeText.split('\n').filter(line => line.trim());
+            const codeLines = codeText.split('__NEWLINE__').filter(line => line.trim());
             
             codeLines.forEach(line => {
                 try {
@@ -110,16 +130,46 @@ export function generateScripts(): string {
         const viewport = document.getElementById('viewport');
         const scrollContainer = document.getElementById('scrollContainer');
         
+        if (!scrollContainer) {
+            console.error('❌ Scroll container not found!');
+            return;
+        }
+        
         // Update container height on resize
         const updateContainerHeight = () => {
-            // Ensure minimum height for proper scrolling
             const rect = scrollContainer.getBoundingClientRect();
-            state.containerHeight = Math.max(400, rect.height - 100); // Minimum 400px
-            console.log('Container height updated:', state.containerHeight);
+            const computedStyle = window.getComputedStyle(scrollContainer);
+            const paddingTop = parseFloat(computedStyle.paddingTop) || 0;
+            const paddingBottom = parseFloat(computedStyle.paddingBottom) || 0;
+            
+            // Calculate actual available height
+            const availableHeight = rect.height - paddingTop - paddingBottom;
+            
+            // Ensure minimum height for proper scrolling
+            state.containerHeight = Math.max(400, availableHeight || 600);
+            
+            console.log('📏 Container measurements:', {
+                rect: { width: rect.width, height: rect.height },
+                padding: { top: paddingTop, bottom: paddingBottom },
+                calculated: state.containerHeight,
+                scrollHeight: scrollContainer.scrollHeight,
+                clientHeight: scrollContainer.clientHeight
+            });
+            
             renderVisibleRows();
         };
         
-        updateContainerHeight();
+        // Initial setup with multiple attempts
+        const setupAttempt = (attempt = 1) => {
+            updateContainerHeight();
+            
+            if (state.containerHeight <= 0 && attempt < 3) {
+                console.warn(\`⚠️ Container height is \${state.containerHeight}, retrying... (attempt \${attempt})\`);
+                setTimeout(() => setupAttempt(attempt + 1), 100 * attempt);
+            }
+        };
+        
+        setupAttempt();
         window.addEventListener('resize', updateContainerHeight);
         
         // Handle scroll events
@@ -131,6 +181,22 @@ export function generateScripts(): string {
     
     // Render visible rows based on scroll position
     function renderVisibleRows() {
+        // Safety check
+        if (!state.filteredIssues || state.filteredIssues.length === 0) {
+            console.log('📋 No issues to render');
+            return;
+        }
+        
+        // Ensure container height is valid
+        if (!state.containerHeight || state.containerHeight <= 0) {
+            console.warn('⚠️ Invalid container height:', state.containerHeight);
+            const scrollContainer = document.getElementById('scrollContainer');
+            if (scrollContainer) {
+                state.containerHeight = scrollContainer.clientHeight || 600;
+                console.log('📏 Recalculated container height:', state.containerHeight);
+            }
+        }
+        
         const totalHeight = state.filteredIssues.length * CONFIG.ROW_HEIGHT;
         const visibleStart = Math.floor(state.scrollTop / CONFIG.ROW_HEIGHT) - CONFIG.VISIBLE_BUFFER;
         const visibleEnd = Math.ceil((state.scrollTop + state.containerHeight) / CONFIG.ROW_HEIGHT) + CONFIG.VISIBLE_BUFFER;
@@ -138,9 +204,23 @@ export function generateScripts(): string {
         state.visibleStart = Math.max(0, visibleStart);
         state.visibleEnd = Math.min(state.filteredIssues.length, visibleEnd);
         
+        // Debug logging
+        if (state.visibleEnd - state.visibleStart > 0) {
+            console.log('🎯 Rendering rows:', {
+                total: state.filteredIssues.length,
+                visible: [state.visibleStart, state.visibleEnd],
+                count: state.visibleEnd - state.visibleStart,
+                scrollTop: state.scrollTop,
+                containerHeight: state.containerHeight
+            });
+        }
+        
         // Update spacers
-        document.getElementById('spacerTop').style.height = (state.visibleStart * CONFIG.ROW_HEIGHT) + 'px';
-        document.getElementById('spacerBottom').style.height = 
+        const spacerTop = document.getElementById('spacerTop');
+        const spacerBottom = document.getElementById('spacerBottom');
+        
+        if (spacerTop) spacerTop.style.height = (state.visibleStart * CONFIG.ROW_HEIGHT) + 'px';
+        if (spacerBottom) spacerBottom.style.height = 
             ((state.filteredIssues.length - state.visibleEnd) * CONFIG.ROW_HEIGHT) + 'px';
         
         // Get visible issues
@@ -148,12 +228,19 @@ export function generateScripts(): string {
         
         // Render rows
         const tbody = document.getElementById('issuesBody');
+        if (!tbody) {
+            console.error('❌ Issues tbody not found!');
+            return;
+        }
+        
         tbody.innerHTML = '';
         
         visibleIssues.forEach((issue, index) => {
             const row = createIssueRow(issue, state.visibleStart + index);
             tbody.appendChild(row);
         });
+        
+        console.log('✅ Rendered ' + visibleIssues.length + ' rows');
     }
     
     // Create issue row
@@ -328,9 +415,9 @@ export function generateScripts(): string {
                 const lineContent = escapeHtml(line.content || '');
                 
                 if (isTarget) {
-                    content += '<span class="highlight-line">' + lineNum + ': ' + lineContent + '</span>\n';
+                    content += '<span class="highlight-line">' + lineNum + ': ' + lineContent + '</span>\\\\n';
                 } else {
-                    content += lineNum + ': ' + lineContent + '\n';
+                    content += lineNum + ': ' + lineContent + '\\\\n';
                 }
             });
             
@@ -417,25 +504,78 @@ export function generateScripts(): string {
     
     // Recovery function for troubleshooting
     window.recoverDashboard = function() {
-        console.log('🔧 Running dashboard recovery...');
+        console.log('🔧 Running comprehensive dashboard recovery...');
         
-        // Reset state
+        // Force recalculate container dimensions
+        const scrollContainer = document.getElementById('scrollContainer');
+        if (!scrollContainer) {
+            console.error('❌ Scroll container not found!');
+            return;
+        }
+        
+        // Ensure container has proper height
+        if (!scrollContainer.style.height || scrollContainer.style.height === '0px') {
+            scrollContainer.style.height = '600px';
+            scrollContainer.style.minHeight = '400px';
+            console.log('📐 Applied default container height');
+        }
+        
+        // Get fresh measurements
+        const rect = scrollContainer.getBoundingClientRect();
+        const computedStyle = window.getComputedStyle(scrollContainer);
+        
+        // Reset state with valid values
         state.scrollTop = 0;
         state.visibleStart = 0;
         state.visibleEnd = Math.min(50, state.filteredIssues.length);
-        state.containerHeight = document.getElementById('scrollContainer').clientHeight || 600;
+        state.containerHeight = Math.max(400, rect.height || 600);
+        
+        console.log('📊 Recovery state:', {
+            issues: state.allIssues.length,
+            filtered: state.filteredIssues.length,
+            containerHeight: state.containerHeight,
+            containerStyle: {
+                height: computedStyle.height,
+                minHeight: computedStyle.minHeight,
+                maxHeight: computedStyle.maxHeight,
+                overflow: computedStyle.overflow
+            }
+        });
         
         // Re-filter and render
         filterData();
-        renderVisibleRows();
+        
+        // Force multiple render attempts
+        let rendered = false;
+        for (let i = 0; i < 3; i++) {
+            renderVisibleRows();
+            const tbody = document.getElementById('issuesBody');
+            if (tbody && tbody.children.length > 0) {
+                rendered = true;
+                break;
+            }
+            console.log(\`Recovery render attempt \${i + 1} failed, retrying...\`);
+        }
         
         // Scroll to top
-        document.getElementById('scrollContainer').scrollTop = 0;
+        scrollContainer.scrollTop = 0;
         
-        console.log('✅ Recovery complete');
-        console.log('Issues available:', state.filteredIssues.length);
-        console.log('Rows rendered:', document.getElementById('issuesBody').children.length);
-        console.log('Container height:', state.containerHeight);
+        console.log(rendered ? '✅ Recovery complete!' : '❌ Recovery failed after 3 attempts');
+        console.log('Final state:', {
+            rowsRendered: document.getElementById('issuesBody').children.length,
+            containerHeight: state.containerHeight,
+            scrollHeight: scrollContainer.scrollHeight
+        });
+        
+        // Provide diagnostic info if recovery failed
+        if (!rendered) {
+            console.log('🔍 Diagnostic info:');
+            console.log('- Issues data present:', state.allIssues.length > 0);
+            console.log('- Filtered issues:', state.filteredIssues.length);
+            console.log('- Container found:', !!scrollContainer);
+            console.log('- Tbody found:', !!document.getElementById('issuesBody'));
+            console.log('- Spacers found:', !!document.getElementById('spacerTop'), !!document.getElementById('spacerBottom'));
+        }
     };
   `;
 }

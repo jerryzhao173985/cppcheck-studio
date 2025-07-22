@@ -148,7 +148,8 @@ export class StandaloneVirtualDashboardGenerator {
   }
 
   private generateJsonl(issues: Issue[]): string {
-    return issues.map(issue => JSON.stringify(issue)).join('\n');
+    // Join with a placeholder that won't break JavaScript parsing
+    return issues.map(issue => JSON.stringify(issue)).join('__NEWLINE__');
   }
 
   private generateCodeContextJsonl(codeContextMap: Map<string, CodeContext>): string {
@@ -156,7 +157,8 @@ export class StandaloneVirtualDashboardGenerator {
     for (const [id, context] of codeContextMap) {
       entries.push(JSON.stringify({ id, code_context: context }));
     }
-    return entries.join('\n');
+    // Join with a placeholder that won't break JavaScript parsing
+    return entries.join('__NEWLINE__');
   }
 
   private generateHtml(
