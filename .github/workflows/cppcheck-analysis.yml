@@ -79,7 +79,7 @@ jobs:
           "${ANALYZE_DIR}" 2> cppcheck-results.xml
         
         # Convert XML to JSON
-        python3 xml2json.py cppcheck-results.xml > analysis.json
+        python3 xml2json-simple.py cppcheck-results.xml > analysis.json
         
         # Add code context
         python3 add-code-context.py analysis.json analysis-with-context.json

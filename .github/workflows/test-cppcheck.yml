@@ -32,7 +32,6 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y cppcheck
-        pip install lxml
         cppcheck --version
 
     - name: Build and install dashboard generator
@@ -127,7 +126,8 @@ jobs:
     - name: Convert XML to JSON
       run: |
         echo "Converting XML to JSON..."
-        python3 xml2json.py cppcheck-results.xml > analysis.json
+        # Use simple XML parser that doesn't require lxml
+        python3 xml2json-simple.py cppcheck-results.xml > analysis.json
         
         echo "JSON output preview:"
         head -20 analysis.json || true

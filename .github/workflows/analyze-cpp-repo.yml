@@ -51,8 +51,7 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y cppcheck
         
-        # Install Python dependencies
-        pip install lxml
+        # No Python dependencies needed
         
         # Build and install dashboard generator
         cd cppcheck-studio/cppcheck-dashboard-generator
@@ -115,7 +114,7 @@ jobs:
         
         # Convert results
         echo "Converting results to JSON..."
-        python3 cppcheck-studio/xml2json.py cppcheck-results.xml > analysis.json
+        python3 cppcheck-studio/xml2json-simple.py cppcheck-results.xml > analysis.json
         
         # Add code context
         echo "Adding code context..."
