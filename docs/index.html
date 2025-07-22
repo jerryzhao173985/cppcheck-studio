@@ -511,7 +511,14 @@
         <p>CPPCheck Studio is open source • <a href="https://github.com/jerryzhao173985/cppcheck-studio">View on GitHub</a></p>
     </footer>
 
+    <script src="cppcheck-client.js"></script>
     <script>
+        // Initialize CPPCheck client
+        const cppcheckClient = new CPPCheckClient({
+            // In production, point to your backend service
+            apiUrl: window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://api.cppcheck.studio'
+        });
+        
         // Sample history data (in production, this would come from an API)
         const sampleHistory = [
             {
@@ -559,7 +566,7 @@
             return null;
         }
 
-        function analyzeRepository() {
+        async function analyzeRepository() {
             const input = document.getElementById('repoInput').value;
             const repo = parseRepoUrl(input);
             
@@ -570,21 +577,24 @@
             
             showStatus('info', `🔄 Triggering analysis for ${repo}...`);
             
-            // In production, this would trigger the GitHub Action via API
-            // For now, we'll simulate it
-            setTimeout(() => {
-                // Show success and redirect to results
-                showStatus('success', `✅ Analysis started! Redirecting to results...`);
+            try {
+                // For demo, use the demo simulator
+                // In production, use: const result = await cppcheckClient.analyzeRepository(repo);
+                const result = await CPPCheckDemo.simulateAnalysis(repo);
+                
+                showStatus('success', `✅ Analysis started! ID: ${result.analysisId}`);
                 
                 // Add to history
                 addToHistory(repo);
                 
-                // In production, redirect to the actual results
+                // Show results preview
                 setTimeout(() => {
-                    // For demo, we'll show a preview
-                    showResultsPreview(repo);
-                }, 2000);
-            }, 1500);
+                    showResultsPreview(repo, result);
+                }, 1500);
+                
+            } catch (error) {
+                showError(`Failed to trigger analysis: ${error.message}`);
+            }
         }
 
         function showAdvancedOptions(e) {
@@ -679,24 +689,61 @@
             showResultsPreview(repo);
         }
 
-        function showResultsPreview(repo) {
+        function showResultsPreview(repo, result) {
             const preview = document.getElementById('resultsPreview');
             const content = document.getElementById('resultsContent');
             
             preview.style.display = 'block';
-            content.innerHTML = `
-                <p><strong>Repository:</strong> ${repo}</p>
-                <p><strong>Status:</strong> Analysis complete</p>
-                <div style="margin: 20px 0;">
-                    <a href="dashboard.html" class="analyze-btn" style="display: inline-flex;">
-                        <span>📊</span>
-                        <span>View Full Dashboard</span>
-                    </a>
-                </div>
-                <p style="color: #666; font-size: 0.9em; margin-top: 20px;">
-                    This is a demo preview. In production, this would show live results from your analysis.
-                </p>
-            `;
+            
+            if (result && result.summary) {
+                content.innerHTML = `
+                    <p><strong>Repository:</strong> ${repo}</p>
+                    <p><strong>Analysis ID:</strong> ${result.analysisId}</p>
+                    <p><strong>Status:</strong> ✅ Complete</p>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 15px; margin: 20px 0;">
+                        <div style="text-align: center; padding: 15px; background: #f3f4f6; border-radius: 8px;">
+                            <div style="font-size: 1.5em; font-weight: bold; color: #667eea;">${result.summary.filesAnalyzed}</div>
+                            <div style="font-size: 0.85em; color: #666;">Files</div>
+                        </div>
+                        <div style="text-align: center; padding: 15px; background: #fee2e2; border-radius: 8px;">
+                            <div style="font-size: 1.5em; font-weight: bold; color: #ef4444;">${result.summary.errors}</div>
+                            <div style="font-size: 0.85em; color: #666;">Errors</div>
+                        </div>
+                        <div style="text-align: center; padding: 15px; background: #fef3c7; border-radius: 8px;">
+                            <div style="font-size: 1.5em; font-weight: bold; color: #f59e0b;">${result.summary.warnings}</div>
+                            <div style="font-size: 0.85em; color: #666;">Warnings</div>
+                        </div>
+                        <div style="text-align: center; padding: 15px; background: #dbeafe; border-radius: 8px;">
+                            <div style="font-size: 1.5em; font-weight: bold; color: #3b82f6;">${result.summary.style}</div>
+                            <div style="font-size: 0.85em; color: #666;">Style</div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin: 20px 0;">
+                        <a href="${result.dashboardUrl}" class="analyze-btn" style="display: inline-flex;">
+                            <span>📊</span>
+                            <span>View Full Dashboard</span>
+                        </a>
+                    </div>
+                    <p style="color: #666; font-size: 0.9em; margin-top: 20px;">
+                        ${window.location.hostname === 'localhost' ? 
+                          'This is a demo. In production, each analysis gets a unique dashboard URL.' : 
+                          'Analysis complete! Click above to view the interactive dashboard.'}
+                    </p>
+                `;
+            } else {
+                content.innerHTML = `
+                    <p><strong>Repository:</strong> ${repo}</p>
+                    <p><strong>Status:</strong> Analysis in progress...</p>
+                    <div style="margin: 20px 0;">
+                        <a href="dashboard.html" class="analyze-btn" style="display: inline-flex;">
+                            <span>📊</span>
+                            <span>View Sample Dashboard</span>
+                        </a>
+                    </div>
+                `;
+            }
             
             // Scroll to results
             preview.scrollIntoView({ behavior: 'smooth', block: 'center' });
