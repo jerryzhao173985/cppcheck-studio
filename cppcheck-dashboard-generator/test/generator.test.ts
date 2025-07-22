@@ -8,6 +8,13 @@ import * as crypto from 'crypto';
 jest.mock('fs');
 const mockFs = fs as jest.Mocked<typeof fs>;
 
+// Mock fs.promises
+mockFs.promises = {
+  readFile: jest.fn(),
+  writeFile: jest.fn(),
+  stat: jest.fn(),
+} as any;
+
 // Mock crypto for consistent IDs
 jest.mock('crypto', () => ({
   createHash: jest.fn(() => ({
@@ -48,6 +55,9 @@ describe('StandaloneVirtualDashboardGenerator', () => {
     mockFs.existsSync.mockReturnValue(true);
     mockFs.readFileSync.mockReturnValue(JSON.stringify(mockAnalysisData));
     mockFs.writeFileSync.mockImplementation(() => {});
+    (mockFs.promises.readFile as jest.Mock).mockResolvedValue(JSON.stringify(mockAnalysisData));
+    (mockFs.promises.writeFile as jest.Mock).mockResolvedValue(undefined);
+    (mockFs.promises.stat as jest.Mock).mockResolvedValue({ size: 1000000 });
   });
 
   describe('constructor', () => {
@@ -90,8 +100,8 @@ describe('StandaloneVirtualDashboardGenerator', () => {
       const generator = new StandaloneVirtualDashboardGenerator(options);
       await generator.generate();
 
-      expect(mockFs.readFileSync).toHaveBeenCalledWith('test.json', 'utf-8');
-      expect(mockFs.writeFileSync).toHaveBeenCalledWith(
+      expect(mockFs.promises.readFile).toHaveBeenCalledWith('test.json', 'utf-8');
+      expect(mockFs.promises.writeFile).toHaveBeenCalledWith(
         'test-output.html',
         expect.stringContaining('<!DOCTYPE html>'),
         'utf-8'
@@ -109,7 +119,7 @@ describe('StandaloneVirtualDashboardGenerator', () => {
     });
 
     it('should handle invalid JSON', async () => {
-      mockFs.readFileSync.mockReturnValue('invalid json');
+      (mockFs.promises.readFile as jest.Mock).mockResolvedValue('invalid json');
       const options: GeneratorOptions = {
         input: 'invalid.json',
       };
@@ -129,7 +139,7 @@ describe('StandaloneVirtualDashboardGenerator', () => {
           },
         ],
       };
-      mockFs.readFileSync.mockReturnValue(JSON.stringify(dataWithoutIds));
+      (mockFs.promises.readFile as jest.Mock).mockResolvedValue(JSON.stringify(dataWithoutIds));
 
       const options: GeneratorOptions = {
         input: 'test.json',
@@ -150,21 +160,21 @@ describe('StandaloneVirtualDashboardGenerator', () => {
       const generator = new StandaloneVirtualDashboardGenerator(options);
       await generator.generate();
 
-      const generatedHtml = mockFs.writeFileSync.mock.calls[0][1] as string;
+      const generatedHtml = (mockFs.promises.writeFile as jest.Mock).mock.calls[0][1] as string;
       expect(generatedHtml).toContain('"total": 2');
       expect(generatedHtml).toContain('"errors": 1');
       expect(generatedHtml).toContain('"warnings": 1');
     });
 
     it('should handle empty issues array', async () => {
-      mockFs.readFileSync.mockReturnValue(JSON.stringify({ issues: [] }));
+      (mockFs.promises.readFile as jest.Mock).mockResolvedValue(JSON.stringify({ issues: [] }));
       const options: GeneratorOptions = {
         input: 'empty.json',
       };
       const generator = new StandaloneVirtualDashboardGenerator(options);
       await generator.generate();
 
-      const generatedHtml = mockFs.writeFileSync.mock.calls[0][1] as string;
+      const generatedHtml = (mockFs.promises.writeFile as jest.Mock).mock.calls[0][1] as string;
       expect(generatedHtml).toContain('"total": 0');
     });
   });
@@ -177,7 +187,7 @@ describe('StandaloneVirtualDashboardGenerator', () => {
       const generator = new StandaloneVirtualDashboardGenerator(options);
       await generator.generate();
 
-      const generatedHtml = mockFs.writeFileSync.mock.calls[0][1] as string;
+      const generatedHtml = (mockFs.promises.writeFile as jest.Mock).mock.calls[0][1] as string;
       expect(generatedHtml).toContain('<script id="issuesData" type="application/x-ndjson">');
       expect(generatedHtml).toMatch(/\{"file":"test\.cpp".*\}\n\{"file":"test2\.cpp".*\}/);
     });
@@ -189,7 +199,7 @@ describe('StandaloneVirtualDashboardGenerator', () => {
       const generator = new StandaloneVirtualDashboardGenerator(options);
       await generator.generate();
 
-      const generatedHtml = mockFs.writeFileSync.mock.calls[0][1] as string;
+      const generatedHtml = (mockFs.promises.writeFile as jest.Mock).mock.calls[0][1] as string;
       expect(generatedHtml).toContain('<script id="codeContextData" type="application/x-ndjson">');
       expect(generatedHtml).toContain('"code_context":{"lines"');
     });
@@ -204,7 +214,7 @@ describe('StandaloneVirtualDashboardGenerator', () => {
       const generator = new StandaloneVirtualDashboardGenerator(options);
       await generator.generate();
 
-      const generatedHtml = mockFs.writeFileSync.mock.calls[0][1] as string;
+      const generatedHtml = (mockFs.promises.writeFile as jest.Mock).mock.calls[0][1] as string;
       expect(generatedHtml).toContain('<title>Custom Dashboard Title</title>');
     });
 
@@ -216,7 +226,7 @@ describe('StandaloneVirtualDashboardGenerator', () => {
       const generator = new StandaloneVirtualDashboardGenerator(options);
       await generator.generate();
 
-      const generatedHtml = mockFs.writeFileSync.mock.calls[0][1] as string;
+      const generatedHtml = (mockFs.promises.writeFile as jest.Mock).mock.calls[0][1] as string;
       expect(generatedHtml).toContain('My Awesome Project');
     });
 
@@ -227,7 +237,7 @@ describe('StandaloneVirtualDashboardGenerator', () => {
       const generator = new StandaloneVirtualDashboardGenerator(options);
       await generator.generate();
 
-      const generatedHtml = mockFs.writeFileSync.mock.calls[0][1] as string;
+      const generatedHtml = (mockFs.promises.writeFile as jest.Mock).mock.calls[0][1] as string;
       expect(generatedHtml).toContain('function initVirtualScroll()');
       expect(generatedHtml).toContain('function renderVisibleRows()');
       expect(generatedHtml).toContain('function filterIssues()');
@@ -240,7 +250,7 @@ describe('StandaloneVirtualDashboardGenerator', () => {
       const generator = new StandaloneVirtualDashboardGenerator(options);
       await generator.generate();
 
-      const generatedHtml = mockFs.writeFileSync.mock.calls[0][1] as string;
+      const generatedHtml = (mockFs.promises.writeFile as jest.Mock).mock.calls[0][1] as string;
       expect(generatedHtml).toContain('<style>');
       expect(generatedHtml).toContain('.dashboard-container');
       expect(generatedHtml).toContain('.virtual-scroll-container');

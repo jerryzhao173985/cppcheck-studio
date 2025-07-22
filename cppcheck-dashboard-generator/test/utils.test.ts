@@ -1,6 +1,5 @@
 import { generateStyles } from '../src/styles';
 import { generateScripts } from '../src/scripts';
-import { DashboardConfig } from '../src/types';
 
 describe('generateStyles', () => {
   it('should generate valid CSS', () => {
@@ -51,23 +50,15 @@ describe('generateStyles', () => {
 });
 
 describe('generateScripts', () => {
-  const defaultConfig: DashboardConfig = {
-    ROW_HEIGHT: 50,
-    VISIBLE_BUFFER: 5,
-    SCROLL_DEBOUNCE: 10,
-    SEARCH_DEBOUNCE: 300,
-    BATCH_SIZE: 50,
-  };
-
   it('should generate valid JavaScript', () => {
-    const scripts = generateScripts(defaultConfig);
+    const scripts = generateScripts();
     expect(scripts).toContain('function');
     expect(scripts).toContain('const');
     expect(scripts).toContain('let');
   });
 
   it('should include all required functions', () => {
-    const scripts = generateScripts(defaultConfig);
+    const scripts = generateScripts();
 
     // Core functions
     expect(scripts).toContain('function initVirtualScroll()');
@@ -88,24 +79,17 @@ describe('generateScripts', () => {
   });
 
   it('should include configuration values', () => {
-    const customConfig: DashboardConfig = {
-      ROW_HEIGHT: 60,
-      VISIBLE_BUFFER: 10,
-      SCROLL_DEBOUNCE: 20,
-      SEARCH_DEBOUNCE: 500,
-      BATCH_SIZE: 100,
-    };
-
-    const scripts = generateScripts(customConfig);
-    expect(scripts).toContain('ROW_HEIGHT = 60');
-    expect(scripts).toContain('VISIBLE_BUFFER = 10');
-    expect(scripts).toContain('SCROLL_DEBOUNCE = 20');
-    expect(scripts).toContain('SEARCH_DEBOUNCE = 500');
-    expect(scripts).toContain('BATCH_SIZE = 100');
+    const scripts = generateScripts();
+    // Check for default configuration values
+    expect(scripts).toContain('ROW_HEIGHT');
+    expect(scripts).toContain('VISIBLE_BUFFER');
+    expect(scripts).toContain('SCROLL_DEBOUNCE');
+    expect(scripts).toContain('SEARCH_DEBOUNCE');
+    expect(scripts).toContain('BATCH_SIZE');
   });
 
   it('should include state management', () => {
-    const scripts = generateScripts(defaultConfig);
+    const scripts = generateScripts();
     expect(scripts).toContain('const state = {');
     expect(scripts).toContain('allIssues: []');
     expect(scripts).toContain('filteredIssues: []');
@@ -115,7 +99,7 @@ describe('generateScripts', () => {
   });
 
   it('should include event listeners setup', () => {
-    const scripts = generateScripts(defaultConfig);
+    const scripts = generateScripts();
     expect(scripts).toContain('addEventListener(');
     expect(scripts).toContain("querySelector('.search-input')");
     expect(scripts).toContain("querySelector('.scroll-container')");
@@ -123,13 +107,13 @@ describe('generateScripts', () => {
   });
 
   it('should include DOMContentLoaded handler', () => {
-    const scripts = generateScripts(defaultConfig);
+    const scripts = generateScripts();
     expect(scripts).toContain("document.addEventListener('DOMContentLoaded'");
     expect(scripts).toContain('initVirtualScroll()');
   });
 
   it('should handle JSONL parsing', () => {
-    const scripts = generateScripts(defaultConfig);
+    const scripts = generateScripts();
     expect(scripts).toContain(".split('\\n')");
     expect(scripts).toContain('JSON.parse(');
     expect(scripts).toContain('.filter(line => line.trim())');

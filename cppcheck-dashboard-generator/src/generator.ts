@@ -14,7 +14,15 @@ export class StandaloneVirtualDashboardGenerator {
 
   async generate(): Promise<void> {
     try {
+      // Check if input file exists
+      if (!fs.existsSync(this.options.input)) {
+        throw new Error('Input file not found');
+      }
+
       // Load and parse input JSON
+      if (this.options.verbose) {
+        console.log('Loading analysis data from:', this.options.input);
+      }
       const data = await this.loadAnalysisData();
       this.issues = data.issues || [];
 

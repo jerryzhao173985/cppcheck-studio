@@ -1,0 +1,99 @@
+name: Example C++ Project Analysis
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run weekly on Sundays
+    - cron: '0 0 * * 0'
+
+jobs:
+  analyze-examples:
+    name: Analyze Example Projects
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        project:
+          - name: "JSON for Modern C++"
+            repo: "nlohmann/json"
+            path: "include"
+          - name: "Catch2"
+            repo: "catchorg/Catch2"
+            path: "src"
+          - name: "fmt"
+            repo: "fmtlib/fmt"
+            path: "include"
+          - name: "spdlog"
+            repo: "gabime/spdlog"
+            path: "include"
+    
+    steps:
+    - name: Checkout CPPCheck Studio
+      uses: actions/checkout@v4
+
+    - name: Setup environment
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cppcheck
+        pip install lxml
+        
+        cd cppcheck-dashboard-generator
+        npm ci
+        npm run build
+        sudo npm link -g
+
+    - name: Clone and analyze ${{ matrix.project.name }}
+      run: |
+        # Clone the repository
+        git clone --depth 1 https://github.com/${{ matrix.project.repo }}.git project
+        
+        # Run analysis
+        cd project
+        cppcheck \
+          --enable=all \
+          --suppress=missingIncludeSystem \
+          --std=c++17 \
+          --xml \
+          --xml-version=2 \
+          ${{ matrix.project.path }} \
+          2> ../cppcheck-results.xml
+        
+        cd ..
+        
+        # Convert and generate dashboard
+        python3 xml2json.py cppcheck-results.xml > analysis.json
+        
+        cd project
+        python3 ../add-code-context.py ../analysis.json ../analysis-with-context.json
+        cd ..
+        
+        # Generate dashboard
+        PROJECT_NAME="${{ matrix.project.name }}"
+        SAFE_NAME=$(echo "${PROJECT_NAME}" | tr ' ' '-' | tr '[:upper:]' '[:lower:]')
+        
+        cppcheck-dashboard \
+          analysis-with-context.json \
+          "dashboard-${SAFE_NAME}.html" \
+          --title "${PROJECT_NAME} Analysis" \
+          --project "${PROJECT_NAME}"
+
+    - name: Upload dashboard
+      uses: actions/upload-artifact@v4
+      with:
+        name: dashboard-${{ strategy.job-index }}
+        path: dashboard-*.html
+
+    - name: Summary
+      run: |
+        echo "### ${{ matrix.project.name }} Analysis Complete"
+        echo "Repository: https://github.com/${{ matrix.project.repo }}"
+        python3 -c "
+import json
+with open('analysis.json') as f:
+    data = json.load(f)
+    print(f'Total issues: {len(data.get(\"issues\", []))}')
+        "
