@@ -21,14 +21,10 @@ class SimpleTrigger {
         });
         localStorage.setItem('cppcheck-analyses', JSON.stringify(analyses.slice(0, 100)));
         
-        // Create pre-filled workflow URL
-        const params = new URLSearchParams({
-            repository: repository,
-            analysis_id: analysisId
-        });
-        const dispatchUrl = `${this.workflowUrl}?${params}`;
+        // GitHub doesn't support URL pre-filling, so we'll provide clear copy-paste instructions
+        const dispatchUrl = this.workflowUrl;
         
-        // Enhanced instructions with the analysis ID
+        // Enhanced instructions with copy-paste values
         return {
             success: true,
             analysisId,
@@ -37,10 +33,11 @@ class SimpleTrigger {
             triggerTime,
             instructions: [
                 'Click the button below to open GitHub Actions',
-                'Click the "Run workflow" dropdown button',
-                'The repository field should show: <strong>' + repository + '</strong>',
-                'Optionally add this Analysis ID: <code>' + analysisId + '</code>',
-                'Click the green "Run workflow" button to start'
+                'Click the <strong>"Run workflow"</strong> dropdown button',
+                'Fill in these fields:',
+                '• Repository: <code style="user-select: all; cursor: pointer" onclick="navigator.clipboard.writeText(\'' + repository + '\')">' + repository + '</code> (click to copy)',
+                '• Analysis ID: <code style="user-select: all; cursor: pointer" onclick="navigator.clipboard.writeText(\'' + analysisId + '\')">' + analysisId + '</code> (click to copy)',
+                'Click the green <strong>"Run workflow"</strong> button to start'
             ],
             tracking: {
                 analysisId,

@@ -9,6 +9,10 @@ on:
         description: 'GitHub repository to analyze (owner/repo)'
         required: true
         type: string
+      analysis_id:
+        description: 'Unique analysis ID for tracking (auto-generated)'
+        required: false
+        type: string
       branch:
         description: 'Branch to analyze'
         required: false
@@ -38,15 +42,20 @@ jobs:
           echo "BRANCH=${{ github.event.client_payload.branch || 'main' }}" >> $GITHUB_ENV
           echo "MAX_FILES=${{ github.event.client_payload.max_files || 500 }}" >> $GITHUB_ENV
           echo "CALLBACK_URL=${{ github.event.client_payload.callback_url }}" >> $GITHUB_ENV
+          echo "ANALYSIS_ID=${{ github.event.client_payload.analysis_id || '$(date +%s)-$(echo $RANDOM)' }}" >> $GITHUB_ENV
         else
           echo "REPO=${{ github.event.inputs.repository }}" >> $GITHUB_ENV
           echo "BRANCH=${{ github.event.inputs.branch }}" >> $GITHUB_ENV
           echo "MAX_FILES=${{ github.event.inputs.max_files }}" >> $GITHUB_ENV
           echo "CALLBACK_URL=${{ github.event.inputs.callback_url }}" >> $GITHUB_ENV
+          
+          # Use provided analysis ID or generate one
+          if [ -n "${{ github.event.inputs.analysis_id }}" ]; then
+            echo "ANALYSIS_ID=${{ github.event.inputs.analysis_id }}" >> $GITHUB_ENV
+          else
+            echo "ANALYSIS_ID=$(date +%s)-$(echo $RANDOM)" >> $GITHUB_ENV
+          fi
         fi
-        
-        # Generate unique ID for this analysis
-        echo "ANALYSIS_ID=$(date +%s)-$(echo $RANDOM)" >> $GITHUB_ENV
 
     - name: Checkout CPPCheck Studio
       uses: actions/checkout@v4
@@ -148,6 +157,25 @@ jobs:
         python3 ../cppcheck-studio/add-code-context.py ../analysis.json ../analysis-with-context.json
         cd ..
 
+    - name: Create status update
+      if: always()
+      run: |
+        # Create status directory in output
+        mkdir -p output/status
+        
+        # Create status file
+        cat > output/status/${{ env.ANALYSIS_ID }}.json << EOF
+        {
+          "analysis_id": "${{ env.ANALYSIS_ID }}",
+          "repository": "${{ env.REPO }}",
+          "status": "running",
+          "workflow_run_id": "${{ github.run_id }}",
+          "workflow_run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+          "updated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "message": "Generating dashboard..."
+        }
+        EOF
+        
     - name: Generate dashboard
       run: |
         # Create output directory
@@ -193,12 +221,55 @@ jobs:
           output/metadata.json
           analysis.json
 
-    - name: Deploy to GitHub Pages results directory
+    - name: Update analysis results and status
       if: github.ref == 'refs/heads/main'
       run: |
-        # This would deploy to a results subdirectory
-        # In production, you'd set up proper deployment
-        echo "Results would be deployed to: https://jerryzhao173985.github.io/cppcheck-studio/results/${{ env.ANALYSIS_ID }}/"
+        # Clone the repo to update results
+        git clone https://github.com/${{ github.repository }}.git deploy-repo
+        cd deploy-repo
+        
+        # Create directories
+        mkdir -p docs/results/${{ env.ANALYSIS_ID }}
+        mkdir -p docs/api/status
+        mkdir -p docs/api/analyses
+        
+        # Copy dashboard and metadata
+        cp ../output/dashboard-${{ env.ANALYSIS_ID }}.html docs/results/${{ env.ANALYSIS_ID }}/index.html
+        cp ../output/metadata.json docs/results/${{ env.ANALYSIS_ID }}/
+        cp ../output/metadata.json docs/api/analyses/${{ env.ANALYSIS_ID }}.json
+        
+        # Create final status
+        cat > docs/api/status/${{ env.ANALYSIS_ID }}.json << EOF
+        {
+          "analysis_id": "${{ env.ANALYSIS_ID }}",
+          "repository": "${{ env.REPO }}",
+          "status": "completed",
+          "workflow_run_id": "${{ github.run_id }}",
+          "workflow_run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+          "completed_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "files_analyzed": ${{ env.FILE_COUNT }},
+          "issues_found": ${{ env.ISSUE_COUNT }},
+          "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/${{ env.ANALYSIS_ID }}/index.html"
+        }
+        EOF
+        
+        # Update gallery
+        if [ -f docs/api/gallery.json ]; then
+          jq --argjson new "$(cat docs/api/analyses/${{ env.ANALYSIS_ID }}.json)" \
+            '.analyses = ([$new] + .analyses | unique_by(.analysis_id) | .[0:50])' \
+            docs/api/gallery.json > temp.json
+          mv temp.json docs/api/gallery.json
+        else
+          jq -n --argjson metadata "$(cat docs/api/analyses/${{ env.ANALYSIS_ID }}.json)" \
+            '{analyses: [$metadata]}' > docs/api/gallery.json
+        fi
+        
+        # Commit and push
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        git add docs/
+        git commit -m "Add analysis results for ${{ env.REPO }} (#${{ env.ANALYSIS_ID }})" || echo "No changes"
+        git push
 
     - name: Send callback if provided
       if: env.CALLBACK_URL != ''

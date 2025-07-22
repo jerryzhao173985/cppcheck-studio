@@ -629,8 +629,24 @@
                             ${result.instructions.map(step => `<li>${step}</li>`).join('')}
                         </ol>
                         
-                        <div style="background: #fff3cd; padding: 10px; border-radius: 5px; margin-top: 15px;">
-                            <strong>💡 Tip:</strong> Your analysis is being tracked with ID: <code>${result.analysisId}</code>
+                        <div style="background: #e8f4fd; padding: 15px; border-radius: 8px; margin-top: 20px;">
+                            <h4 style="margin-top: 0;">📋 Copy these values:</h4>
+                            <div style="margin: 10px 0;">
+                                <strong>Repository:</strong> 
+                                <code style="background: #263238; color: #aed581; padding: 4px 8px; border-radius: 4px; cursor: pointer; user-select: all;" 
+                                      onclick="navigator.clipboard.writeText('${repo}'); this.style.background='#4caf50'; setTimeout(() => this.style.background='#263238', 1000)">
+                                    ${repo}
+                                </code>
+                                <span style="font-size: 0.8em; color: #666;">(click to copy)</span>
+                            </div>
+                            <div style="margin: 10px 0;">
+                                <strong>Analysis ID:</strong> 
+                                <code style="background: #263238; color: #aed581; padding: 4px 8px; border-radius: 4px; cursor: pointer; user-select: all;" 
+                                      onclick="navigator.clipboard.writeText('${result.analysisId}'); this.style.background='#4caf50'; setTimeout(() => this.style.background='#263238', 1000)">
+                                    ${result.analysisId}
+                                </code>
+                                <span style="font-size: 0.8em; color: #666;">(click to copy)</span>
+                            </div>
                         </div>
                     </div>
                     
