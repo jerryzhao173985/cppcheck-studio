@@ -1,6 +1,8 @@
 # CPPCheck Studio
 
 <p align="center">
+  <a href="https://jerryzhao173985.github.io/cppcheck-studio/"><img src="https://img.shields.io/badge/GitHub%20Pages-online-success" alt="GitHub Pages Status"></a>
+  <a href="https://github.com/jerryzhao173985/cppcheck-studio/actions/workflows/deploy-docs.yml"><img src="https://github.com/jerryzhao173985/cppcheck-studio/actions/workflows/deploy-docs.yml/badge.svg" alt="Deploy Status"></a>
   <img src="https://img.shields.io/badge/version-2.0.0-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License">
   <img src="https://img.shields.io/badge/python-%3E%3D3.6-brightgreen.svg" alt="Python">

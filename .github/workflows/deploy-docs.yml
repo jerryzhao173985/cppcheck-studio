@@ -3,13 +3,14 @@ name: Deploy Docs to GitHub Pages
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'docs/**'
-      - '.github/workflows/deploy-docs.yml'
-      - '.github/workflows/analyze-on-demand.yml'  # Deploy when analysis workflow changes
+    # ALWAYS deploy on ANY push to main - no path restrictions!
   workflow_dispatch:
   schedule:
-    - cron: '0 */6 * * *'  # Keep alive every 6 hours
+    - cron: '0 */2 * * *'  # Keep alive every 2 hours
+  workflow_run:
+    workflows: ["*"]
+    types:
+      - completed
 
 permissions:
   contents: read

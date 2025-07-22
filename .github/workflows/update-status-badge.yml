@@ -1,0 +1,47 @@
+name: Update GitHub Pages Status Badge
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'  # Every 15 minutes
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  update-badge:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Check Site Status
+      run: |
+        STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://jerryzhao173985.github.io/cppcheck-studio/)
+        
+        if [ "$STATUS" = "200" ]; then
+          echo "BADGE_COLOR=success" >> $GITHUB_ENV
+          echo "BADGE_TEXT=online" >> $GITHUB_ENV
+        else
+          echo "BADGE_COLOR=critical" >> $GITHUB_ENV
+          echo "BADGE_TEXT=offline" >> $GITHUB_ENV
+        fi
+        
+    - name: Update README Badge
+      run: |
+        # Update the GitHub Pages status badge in README
+        sed -i.bak 's|https://img.shields.io/badge/GitHub%20Pages-[^-]*-[^)]*|https://img.shields.io/badge/GitHub%20Pages-${{ env.BADGE_TEXT }}-${{ env.BADGE_COLOR }}|g' README.md || true
+        
+        # Check if there are changes
+        if git diff --quiet; then
+          echo "No changes to commit"
+        else
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add README.md
+          git commit -m "Update GitHub Pages status badge [skip ci]"
+          git push
+        fi
