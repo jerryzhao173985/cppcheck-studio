@@ -1,0 +1,394 @@
+#!/usr/bin/env python3
+"""
+CPPCheck Studio - Professional C++ Static Analysis Tool
+Transform cppcheck results into beautiful, interactive dashboards
+"""
+
+import os
+import sys
+import json
+import argparse
+import subprocess
+import tempfile
+import webbrowser
+import shutil
+from pathlib import Path
+from datetime import datetime
+
+# Add lib directory to path
+SCRIPT_DIR = Path(__file__).parent.resolve()
+
+# Check if we're running from an installed location or development
+if (SCRIPT_DIR.parent / 'lib' / 'cppcheck-studio').exists():
+    # Installed location - lib is at ../lib/cppcheck-studio
+    LIB_DIR = SCRIPT_DIR.parent / 'lib' / 'cppcheck-studio'
+else:
+    # Development location - lib is at ../lib
+    LIB_DIR = SCRIPT_DIR.parent / 'lib'
+
+sys.path.insert(0, str(LIB_DIR))
+
+# Version
+VERSION = "2.0.0"
+
+# Colors for terminal output
+class Colors:
+    RED = '\033[0;31m'
+    GREEN = '\033[0;32m'
+    YELLOW = '\033[1;33m'
+    BLUE = '\033[0;34m'
+    PURPLE = '\033[0;35m'
+    CYAN = '\033[0;36m'
+    WHITE = '\033[1;37m'
+    NC = '\033[0m'  # No Color
+
+def print_banner():
+    """Print the CPPCheck Studio banner"""
+    print(f"""{Colors.BLUE}
+╔═══════════════════════════════════════════╗
+║      CPPCheck Studio v{VERSION}           ║
+║  Professional C++ Static Analysis Tool    ║
+╚═══════════════════════════════════════════╝{Colors.NC}
+""")
+
+def check_dependencies():
+    """Check if required dependencies are installed"""
+    errors = []
+    
+    # Check Python version
+    if sys.version_info < (3, 6):
+        errors.append("Python 3.6 or higher is required")
+    
+    # Check cppcheck
+    if shutil.which('cppcheck') is None:
+        errors.append("cppcheck is not installed. Install with: brew install cppcheck (macOS) or apt-get install cppcheck (Linux)")
+    
+    if errors:
+        print(f"{Colors.RED}✗ Dependency check failed:{Colors.NC}")
+        for error in errors:
+            print(f"  - {error}")
+        sys.exit(1)
+
+def get_config():
+    """Load configuration from .cppcheck-studio.yml if it exists"""
+    config_files = ['.cppcheck-studio.yml', '.cppcheck-studio.yaml', '.cppcheck-studio.json']
+    
+    for config_file in config_files:
+        if os.path.exists(config_file):
+            if config_file.endswith('.json'):
+                with open(config_file) as f:
+                    return json.load(f)
+            else:
+                # For YAML, just return a simple dict for now
+                return {}
+    
+    return {}
+
+def run_analyze(args):
+    """Run cppcheck analysis"""
+    print(f"{Colors.CYAN}🔍 Running CPPCheck analysis...{Colors.NC}")
+    
+    # Default paths
+    source_path = args.path or '.'
+    output_dir = '.cppcheck-studio'
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Build cppcheck command
+    cmd = ['cppcheck']
+    
+    # Add profile-specific options
+    if args.profile == 'quick':
+        cmd.extend(['--enable=warning,style,performance'])
+    elif args.profile == 'full':
+        cmd.extend(['--enable=all'])
+    elif args.profile == 'cpp17':
+        cmd.extend(['--enable=all', '--std=c++17'])
+    elif args.profile == 'memory':
+        cmd.extend(['--enable=warning,style,performance,portability', '--std=c++17'])
+    elif args.profile == 'performance':
+        cmd.extend(['--enable=performance,style'])
+    
+    # Add common options
+    cmd.extend([
+        '--suppress=missingIncludeSystem',
+        '--inline-suppr',
+        '--template="{file}:{line}:{column}: {severity}: {message} [{id}]"',
+        f'--output-file={output_dir}/analysis.txt'
+    ])
+    
+    # Add JSON output
+    cmd.extend(['--output-file=' + output_dir + '/analysis.json', '--template=gcc'])
+    
+    # Add path
+    cmd.append(source_path)
+    
+    # Run cppcheck
+    print(f"  Command: {' '.join(cmd)}")
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    
+    if result.returncode != 0 and result.stderr:
+        print(f"{Colors.YELLOW}⚠️  CPPCheck warnings:{Colors.NC}")
+        print(result.stderr)
+    
+    # Convert output to JSON format
+    json_output = output_dir + '/analysis.json'
+    convert_to_json(output_dir + '/analysis.txt', json_output)
+    
+    # Print summary
+    with open(json_output) as f:
+        data = json.load(f)
+        issues = data.get('issues', [])
+        
+    print(f"\n{Colors.GREEN}✅ Analysis complete!{Colors.NC}")
+    print(f"  Total issues: {len(issues)}")
+    print(f"  Output saved to: {json_output}")
+    
+    # Save as latest analysis
+    shutil.copy(json_output, output_dir + '/latest.json')
+    
+    return json_output
+
+def convert_to_json(txt_file, json_file):
+    """Convert cppcheck text output to JSON format"""
+    issues = []
+    
+    if os.path.exists(txt_file):
+        with open(txt_file, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                
+                # Parse cppcheck output format
+                # Format: file:line:column: severity: message [id]
+                parts = line.split(':', 3)
+                if len(parts) >= 4:
+                    file_path = parts[0]
+                    line_num = parts[1]
+                    severity_msg = parts[3].strip()
+                    
+                    # Extract severity and message
+                    severity_parts = severity_msg.split(':', 1)
+                    if len(severity_parts) >= 2:
+                        severity = severity_parts[0].strip()
+                        msg_and_id = severity_parts[1].strip()
+                        
+                        # Extract message and ID
+                        if '[' in msg_and_id and msg_and_id.endswith(']'):
+                            message = msg_and_id[:msg_and_id.rfind('[')].strip()
+                            issue_id = msg_and_id[msg_and_id.rfind('[')+1:-1]
+                        else:
+                            message = msg_and_id
+                            issue_id = 'unknown'
+                        
+                        issues.append({
+                            'file': file_path,
+                            'line': line_num,
+                            'severity': severity,
+                            'message': message,
+                            'id': issue_id
+                        })
+    
+    # Save as JSON
+    with open(json_file, 'w') as f:
+        json.dump({'issues': issues, 'timestamp': datetime.now().isoformat()}, f, indent=2)
+
+def run_context(args):
+    """Add code context to analysis results"""
+    print(f"{Colors.CYAN}📝 Adding code context...{Colors.NC}")
+    
+    input_file = args.input or '.cppcheck-studio/latest.json'
+    output_file = args.output or '.cppcheck-studio/analysis-with-context.json'
+    
+    # Import the context module
+    from context import add_code_context_to_analysis
+    
+    add_code_context_to_analysis(input_file, output_file, args.lines)
+    
+    return output_file
+
+def run_dashboard(args):
+    """Generate interactive dashboard"""
+    print(f"{Colors.CYAN}📊 Generating dashboard...{Colors.NC}")
+    
+    input_file = args.input or '.cppcheck-studio/latest.json'
+    output_file = args.output or '.cppcheck-studio/dashboard.html'
+    
+    # Check if input has code context
+    with open(input_file) as f:
+        data = json.load(f)
+        has_context = any('code_context' in issue for issue in data.get('issues', []))
+    
+    # Import the appropriate dashboard generator
+    if args.type == 'virtual' or len(data.get('issues', [])) > 1000:
+        from dashboard import VirtualDashboardGenerator
+        generator = VirtualDashboardGenerator(input_file)
+    else:
+        from dashboard import UltimateDashboardGenerator
+        generator = UltimateDashboardGenerator(input_file)
+    
+    generator.generate(output_file)
+    
+    print(f"\n{Colors.GREEN}✅ Dashboard generated!{Colors.NC}")
+    print(f"  Output: {output_file}")
+    print(f"  Type: {args.type}")
+    print(f"  Has code context: {'Yes' if has_context else 'No'}")
+    
+    return output_file
+
+def run_serve(args):
+    """Serve dashboard in browser"""
+    print(f"{Colors.CYAN}🌐 Starting dashboard server...{Colors.NC}")
+    
+    dashboard = args.dashboard or '.cppcheck-studio/dashboard.html'
+    
+    if not os.path.exists(dashboard):
+        print(f"{Colors.RED}✗ Dashboard not found: {dashboard}{Colors.NC}")
+        print("  Run 'cppcheck-studio dashboard' first")
+        sys.exit(1)
+    
+    # Open in browser
+    if not args.no_browser:
+        webbrowser.open(f'file://{os.path.abspath(dashboard)}')
+        print(f"{Colors.GREEN}✅ Dashboard opened in browser{Colors.NC}")
+    
+    # Simple HTTP server for better experience
+    if args.server:
+        import http.server
+        import socketserver
+        
+        os.chdir(os.path.dirname(dashboard))
+        PORT = args.port
+        
+        Handler = http.server.SimpleHTTPRequestHandler
+        with socketserver.TCPServer(("", PORT), Handler) as httpd:
+            print(f"  Server running at http://localhost:{PORT}")
+            print(f"  Press Ctrl+C to stop")
+            httpd.serve_forever()
+
+def run_init(args):
+    """Initialize CPPCheck Studio configuration"""
+    print(f"{Colors.CYAN}🚀 Initializing CPPCheck Studio...{Colors.NC}")
+    
+    config = {
+        'profile': 'cpp17',
+        'exclude': ['build/', 'vendor/', 'third_party/'],
+        'dashboard': {
+            'type': 'ultimate',
+            'theme': 'light'
+        },
+        'output': {
+            'format': 'json',
+            'directory': '.cppcheck-studio/'
+        }
+    }
+    
+    # Save configuration
+    with open('.cppcheck-studio.json', 'w') as f:
+        json.dump(config, f, indent=2)
+    
+    # Create output directory
+    os.makedirs('.cppcheck-studio', exist_ok=True)
+    
+    # Create .gitignore entry
+    gitignore = '.gitignore'
+    if os.path.exists(gitignore):
+        with open(gitignore, 'r') as f:
+            content = f.read()
+        if '.cppcheck-studio/' not in content:
+            with open(gitignore, 'a') as f:
+                f.write('\n# CPPCheck Studio\n.cppcheck-studio/\n')
+    
+    print(f"{Colors.GREEN}✅ Initialized CPPCheck Studio!{Colors.NC}")
+    print(f"  Configuration: .cppcheck-studio.json")
+    print(f"  Output directory: .cppcheck-studio/")
+    print(f"\nNext steps:")
+    print(f"  1. Run analysis: cppcheck-studio analyze")
+    print(f"  2. View results: cppcheck-studio serve")
+
+def main():
+    """Main entry point"""
+    parser = argparse.ArgumentParser(
+        description='CPPCheck Studio - Professional C++ Static Analysis Tool',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  cppcheck-studio analyze                    # Analyze current directory
+  cppcheck-studio dashboard                  # Generate dashboard from latest analysis
+  cppcheck-studio serve                      # View dashboard in browser
+  
+  cppcheck-studio analyze --profile cpp17    # Use C++17 profile
+  cppcheck-studio context --lines 10         # Add 10 lines of context
+  cppcheck-studio dashboard --type virtual   # Use virtual scrolling for large datasets
+        """
+    )
+    
+    parser.add_argument('-v', '--version', action='version', version=f'CPPCheck Studio {VERSION}')
+    
+    subparsers = parser.add_subparsers(dest='command', help='Available commands')
+    
+    # Analyze command
+    analyze_parser = subparsers.add_parser('analyze', help='Run cppcheck analysis')
+    analyze_parser.add_argument('path', nargs='?', help='Path to analyze (default: current directory)')
+    analyze_parser.add_argument('-p', '--profile', choices=['quick', 'full', 'cpp17', 'memory', 'performance'],
+                               default='cpp17', help='Analysis profile')
+    analyze_parser.add_argument('-o', '--output', help='Output file')
+    
+    # Context command
+    context_parser = subparsers.add_parser('context', help='Add code context to analysis')
+    context_parser.add_argument('input', nargs='?', help='Input analysis JSON')
+    context_parser.add_argument('-o', '--output', help='Output file')
+    context_parser.add_argument('-l', '--lines', type=int, default=5, help='Context lines')
+    
+    # Dashboard command
+    dashboard_parser = subparsers.add_parser('dashboard', help='Generate interactive dashboard')
+    dashboard_parser.add_argument('input', nargs='?', help='Input analysis JSON')
+    dashboard_parser.add_argument('-o', '--output', help='Output HTML file')
+    dashboard_parser.add_argument('-t', '--type', choices=['ultimate', 'virtual', 'minimal'],
+                                 default='ultimate', help='Dashboard type')
+    
+    # Serve command
+    serve_parser = subparsers.add_parser('serve', help='View dashboard in browser')
+    serve_parser.add_argument('dashboard', nargs='?', help='Dashboard HTML file')
+    serve_parser.add_argument('--no-browser', action='store_true', help="Don't open browser")
+    serve_parser.add_argument('--server', action='store_true', help='Start HTTP server')
+    serve_parser.add_argument('--port', type=int, default=8080, help='Server port')
+    
+    # Init command
+    init_parser = subparsers.add_parser('init', help='Initialize CPPCheck Studio configuration')
+    
+    # Parse arguments
+    args = parser.parse_args()
+    
+    # Show banner for interactive commands
+    if args.command and sys.stdout.isatty():
+        print_banner()
+    
+    # Check dependencies
+    if args.command in ['analyze', 'context', 'dashboard']:
+        check_dependencies()
+    
+    # Execute command
+    if args.command == 'analyze':
+        run_analyze(args)
+    elif args.command == 'context':
+        run_context(args)
+    elif args.command == 'dashboard':
+        run_dashboard(args)
+    elif args.command == 'serve':
+        run_serve(args)
+    elif args.command == 'init':
+        run_init(args)
+    else:
+        parser.print_help()
+        sys.exit(1)
+
+if __name__ == '__main__':
+    try:
+        main()
+    except KeyboardInterrupt:
+        print(f"\n{Colors.YELLOW}Interrupted by user{Colors.NC}")
+        sys.exit(130)
+    except Exception as e:
+        print(f"\n{Colors.RED}Error: {e}{Colors.NC}")
+        sys.exit(1)

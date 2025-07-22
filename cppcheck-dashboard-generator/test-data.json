@@ -1,0 +1,39 @@
+{
+  "issues": [
+    {
+      "file": "src/main.cpp",
+      "line": 42,
+      "severity": "error",
+      "message": "Null pointer dereference",
+      "id": "E001",
+      "code_context": {
+        "lines": [
+          { "number": 41, "content": "void process(int* ptr) {" },
+          { "number": 42, "content": "    *ptr = 10; // Null pointer dereference", "is_target": true },
+          { "number": 43, "content": "}" }
+        ]
+      }
+    },
+    {
+      "file": "src/utils.cpp",
+      "line": 15,
+      "severity": "warning",
+      "message": "Variable 'count' is assigned a value that is never used",
+      "id": "W001"
+    },
+    {
+      "file": "src/config.h",
+      "line": 8,
+      "severity": "style",
+      "message": "The class 'Config' does not have a constructor",
+      "id": "S001"
+    },
+    {
+      "file": "src/database.cpp",
+      "line": 123,
+      "severity": "performance",
+      "message": "Prefer prefix ++/-- operators for non-primitive types",
+      "id": "P001"
+    }
+  ]
+}

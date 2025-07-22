@@ -82,10 +82,16 @@ class CPPCheckStudio:
         """Convert cppcheck XML to JSON"""
         print("📄 Converting XML to JSON...")
         
+        # Look for xml2json.py in both development and installed locations
         xml2json_script = SCRIPT_DIR / 'xml2json.py'
         if not xml2json_script.exists():
-            print("❌ xml2json.py not found!")
-            return False
+            # Try installed location
+            installed_script = Path(__file__).parent.parent / 'lib' / 'cppcheck-studio' / 'xml2json.py'
+            if installed_script.exists():
+                xml2json_script = installed_script
+            else:
+                print("❌ xml2json.py not found!")
+                return False
             
         result = subprocess.run([
             sys.executable, str(xml2json_script), xml_file, json_file
@@ -106,10 +112,16 @@ class CPPCheckStudio:
             
         print("📝 Adding code context...")
         
+        # Look for add-code-context.py in both development and installed locations
         add_context_script = SCRIPT_DIR / 'add-code-context.py'
         if not add_context_script.exists():
-            print("❌ add-code-context.py not found!")
-            return False
+            # Try installed location
+            installed_script = Path(__file__).parent.parent / 'lib' / 'cppcheck-studio' / 'add-code-context.py'
+            if installed_script.exists():
+                add_context_script = installed_script
+            else:
+                print("❌ add-code-context.py not found!")
+                return False
             
         result = subprocess.run([
             sys.executable, str(add_context_script), 
@@ -137,11 +149,21 @@ class CPPCheckStudio:
             'minimal': 'generate-production-dashboard.py'
         }
         
-        generator_script = SCRIPT_DIR / generator_map.get(dashboard_type, generator_map['virtual'])
+        generator_name = generator_map.get(dashboard_type, generator_map['virtual'])
+        generator_script = SCRIPT_DIR / 'generate' / generator_name
         
         if not generator_script.exists():
-            print(f"❌ Dashboard generator not found: {generator_script}")
-            return False
+            # Try without generate subdirectory (backward compatibility)
+            generator_script = SCRIPT_DIR / generator_name
+            
+        if not generator_script.exists():
+            # Try installed location
+            installed_script = Path(__file__).parent.parent / 'lib' / 'cppcheck-studio' / 'generate' / generator_name
+            if installed_script.exists():
+                generator_script = installed_script
+            else:
+                print(f"❌ Dashboard generator not found: {generator_name}")
+                return False
             
         result = subprocess.run([
             sys.executable, str(generator_script),

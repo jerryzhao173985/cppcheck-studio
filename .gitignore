@@ -1,1 +1,32 @@
+# macOS
 .DS_Store
+
+# Node modules
+node_modules/
+*/node_modules/
+
+# Build output
+dist/
+build/
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+test-report-*.json
+python-output.html
+demo-split_*.json
+files-for-commit.txt
+
+# IDE
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Analysis output
+.cppcheck-studio/

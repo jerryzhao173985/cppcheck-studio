@@ -1,0 +1,31 @@
+# Source files (only publish compiled)
+src/
+test/
+examples/
+
+# Configuration files
+.eslintrc.js
+.prettierrc
+jest.config.js
+tsconfig.json
+
+# Development files
+*.log
+*.tgz
+.DS_Store
+coverage/
+.vscode/
+.idea/
+
+# Test files
+*.test.ts
+*.spec.ts
+test-*.json
+*-test.html
+test-output.html
+typescript-output.html
+
+# Scripts
+compare-outputs.sh
+
+# Keep dist/, bin/, README.md, LICENSE, package.json

@@ -1,44 +1,65 @@
 {
   "name": "cppcheck-studio",
-  "version": "1.0.0",
-  "description": "Professional C++ static analysis studio with interactive fixes",
-  "private": true,
-  "workspaces": [
-    "packages/*",
-    "apps/*"
-  ],
-  "scripts": {
-    "dev": "turbo run dev",
-    "build": "turbo run build",
-    "start": "turbo run start",
-    "lint": "turbo run lint",
-    "test": "turbo run test",
-    "studio": "npm run dev --workspace=@cppcheck-studio/web",
-    "api": "npm run dev --workspace=@cppcheck-studio/api"
-  },
-  "devDependencies": {
-    "turbo": "^1.11.0",
-    "@types/node": "^20.10.0",
-    "typescript": "^5.3.0",
-    "prettier": "^3.1.0",
-    "eslint": "^8.55.0"
-  },
-  "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=9.0.0"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/yourusername/cppcheck-studio"
-  },
+  "version": "2.0.0",
+  "description": "Professional C++ static analysis tool with beautiful dashboards",
   "keywords": [
+    "cppcheck",
     "cpp",
     "c++",
     "static-analysis",
     "code-quality",
-    "cppcheck",
+    "dashboard",
+    "linting",
     "developer-tools"
   ],
+  "homepage": "https://github.com/yourusername/cppcheck-studio",
+  "bugs": {
+    "url": "https://github.com/yourusername/cppcheck-studio/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/cppcheck-studio.git"
+  },
+  "license": "MIT",
   "author": "CPPCheck Studio Team",
-  "license": "MIT"
+  "main": "index.js",
+  "bin": {
+    "cppcheck-studio": "./bin/cppcheck-studio"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "templates/",
+    "install.sh",
+    "Makefile",
+    "README.md",
+    "QUICKSTART.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "postinstall": "node scripts/postinstall.js",
+    "test": "make test",
+    "analyze": "bin/cppcheck-studio analyze",
+    "dashboard": "bin/cppcheck-studio dashboard",
+    "serve": "bin/cppcheck-studio serve",
+    "clean": "make clean"
+  },
+  "engines": {
+    "node": ">=14.0.0",
+    "npm": ">=6.0.0"
+  },
+  "os": [
+    "darwin",
+    "linux"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "dependencies": {},
+  "devDependencies": {},
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
 }

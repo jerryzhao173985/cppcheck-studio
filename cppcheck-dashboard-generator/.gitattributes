@@ -1,0 +1,36 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# JS/TS files
+*.js text eol=lf
+*.ts text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+
+# Config files
+.eslintrc.js text eol=lf
+jest.config.js text eol=lf
+.prettierrc text eol=lf
+.gitignore text eol=lf
+.npmignore text eol=lf
+.gitattributes text eol=lf
+
+# Scripts
+*.sh text eol=lf
+bin/* text eol=lf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+
+# Exclude from exports
+test/ export-ignore
+examples/ export-ignore
+scripts/ export-ignore
+.eslintrc.js export-ignore
+jest.config.js export-ignore
+.prettierrc export-ignore
+tsconfig.json export-ignore
