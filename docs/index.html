@@ -515,7 +515,7 @@
     <script>
         // Initialize CPPCheck client
         const cppcheckClient = new CPPCheckClient({
-            // In production, point to your backend service
+            // Note: Direct API calls require a backend service
             apiUrl: window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://api.cppcheck.studio'
         });
         
@@ -575,26 +575,69 @@
                 return;
             }
             
-            showStatus('info', `🔄 Triggering analysis for ${repo}...`);
+            // Show instructions for triggering analysis
+            showStatus('info', `Repository: ${repo}`);
             
-            try {
-                // For demo, use the demo simulator
-                // In production, use: const result = await cppcheckClient.analyzeRepository(repo);
-                const result = await CPPCheckDemo.simulateAnalysis(repo);
-                
-                showStatus('success', `✅ Analysis started! ID: ${result.analysisId}`);
-                
-                // Add to history
-                addToHistory(repo);
-                
-                // Show results preview
-                setTimeout(() => {
-                    showResultsPreview(repo, result);
-                }, 1500);
-                
-            } catch (error) {
-                showError(`Failed to trigger analysis: ${error.message}`);
-            }
+            // Add to history
+            addToHistory(repo);
+            
+            // Show instructions modal
+            showAnalysisInstructions(repo);
+        }
+        
+        function showAnalysisInstructions(repo) {
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'flex';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 700px;">
+                    <h3 class="modal-title">🚀 Trigger Analysis for ${repo}</h3>
+                    
+                    <p style="margin: 20px 0;">Due to GitHub security policies, analysis must be triggered via one of these methods:</p>
+                    
+                    <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                        <h4 style="margin-top: 0;">Option 1: GitHub UI (Easiest)</h4>
+                        <p>Click the button below to go to the workflow page, then:</p>
+                        <ol style="margin: 10px 0;">
+                            <li>Click "Run workflow"</li>
+                            <li>Enter: <code style="background: #e5e7eb; padding: 2px 6px; border-radius: 3px;">${repo}</code></li>
+                            <li>Click the green "Run workflow" button</li>
+                        </ol>
+                        <a href="https://github.com/jerryzhao173985/cppcheck-studio/actions/workflows/analyze-on-demand.yml" 
+                           target="_blank" 
+                           class="analyze-btn" 
+                           style="display: inline-flex; margin: 10px 0;">
+                            <span>🎯</span>
+                            <span>Go to Workflow</span>
+                        </a>
+                    </div>
+                    
+                    <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                        <h4 style="margin-top: 0;">Option 2: GitHub CLI</h4>
+                        <div style="background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 5px; overflow-x: auto; font-family: monospace; font-size: 0.9em;">
+gh workflow run analyze-on-demand.yml \\
+  -R jerryzhao173985/cppcheck-studio \\
+  -f repository="${repo}" \\
+  -f branch="main"</div>
+                    </div>
+                    
+                    <div style="text-align: center; margin-top: 30px;">
+                        <button class="btn-secondary" onclick="this.closest('.modal').remove()" style="margin-right: 10px;">Close</button>
+                        <a href="trigger-analysis.html" class="analyze-btn" style="display: inline-flex;">
+                            <span>📖</span>
+                            <span>View Full Instructions</span>
+                        </a>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            // Close on click outside
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.remove();
+                }
+            });
         }
 
         function showAdvancedOptions(e) {

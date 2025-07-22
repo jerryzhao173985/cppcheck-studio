@@ -1,59 +1,74 @@
 #!/usr/bin/env python3
+"""Generate a detailed Markdown report of CPPCheck analysis results."""
+
 import json
 import sys
 from collections import defaultdict
 
 def generate_report(json_file):
-    with open(json_file) as f:
-        data = json.load(f)
+    """Generate a detailed Markdown report."""
+    try:
+        with open(json_file, 'r') as f:
+            data = json.load(f)
+        
         issues = data.get('issues', [])
+        if not issues:
+            print("# Analysis Report\n\nNo issues found!")
+            return
         
-        # Statistics
-        by_severity = defaultdict(int)
-        by_file = defaultdict(int)
-        by_id = defaultdict(int)
-        
+        # Group by severity
+        by_severity = defaultdict(list)
         for issue in issues:
-            by_severity[issue.get('severity', 'unknown')] += 1
-            by_file[issue.get('file', 'unknown')] += 1
-            by_id[issue.get('id', 'unknown')] += 1
+            by_severity[issue['severity']].append(issue)
         
-        # Report
-        print('# LPZRobots CPPCheck Analysis Report')
-        print()
-        print(f'**Total Issues:** {len(issues)}')
-        if data.get('truncated'):
-            print(f'**Note:** Results truncated from {data.get("original_count", "?")} to {len(issues)} issues')
-        print()
+        # Print report
+        print("# CPPCheck Analysis Report")
+        print(f"\nTotal Issues: **{len(issues)}**\n")
         
-        print('## Issues by Severity')
-        for sev in ['error', 'warning', 'performance', 'style', 'information']:
-            if sev in by_severity:
-                print(f'- **{sev.capitalize()}:** {by_severity[sev]}')
-        print()
+        # Summary table
+        print("## Summary")
+        print("| Severity | Count |")
+        print("|----------|-------|")
+        for severity in ['error', 'warning', 'style', 'performance', 'portability', 'information']:
+            if severity in by_severity:
+                print(f"| {severity.capitalize()} | {len(by_severity[severity])} |")
         
-        print('## Top 10 Files with Most Issues')
-        for file, count in sorted(by_file.items(), key=lambda x: x[1], reverse=True)[:10]:
-            print(f'- {file}: {count} issues')
-        print()
+        # Detailed issues by severity
+        for severity in ['error', 'warning', 'style', 'performance', 'portability', 'information']:
+            if severity not in by_severity:
+                continue
+                
+            print(f"\n## {severity.capitalize()} Issues ({len(by_severity[severity])})")
+            
+            for issue in by_severity[severity][:20]:  # Limit to 20 per category
+                file_location = f"{issue.get('file', 'unknown')}:{issue.get('line', '?')}"
+                print(f"\n### `{issue['id']}` - {file_location}")
+                print(f"\n{issue['message']}")
+                
+                # Add code context if available
+                if 'codeContext' in issue:
+                    context = issue['codeContext']
+                    print("\n```cpp")
+                    if 'beforeLines' in context:
+                        for line in context['beforeLines'][-2:]:
+                            print(line)
+                    if 'lineContent' in context:
+                        print(f">>> {context['lineContent']}  // Line {context.get('lineNumber', '?')}")
+                    if 'afterLines' in context:
+                        for line in context['afterLines'][:2]:
+                            print(line)
+                    print("```")
+            
+            if len(by_severity[severity]) > 20:
+                print(f"\n*... and {len(by_severity[severity]) - 20} more {severity} issues*")
         
-        print('## Top 10 Issue Types')
-        for issue_id, count in sorted(by_id.items(), key=lambda x: x[1], reverse=True)[:10]:
-            print(f'- {issue_id}: {count} occurrences')
-        print()
-        
-        print('## Components Analyzed')
-        components = set()
-        for issue in issues:
-            file = issue.get('file', '')
-            if '/' in file:
-                components.add(file.split('/')[0])
-        for comp in sorted(components):
-            comp_issues = sum(1 for i in issues if i.get('file', '').startswith(comp + '/'))
-            print(f'- **{comp}:** {comp_issues} issues')
+    except Exception as e:
+        print(f"Error generating report: {e}", file=sys.stderr)
+        sys.exit(1)
 
-if __name__ == '__main__':
-    if len(sys.argv) > 1:
-        generate_report(sys.argv[1])
-    else:
-        generate_report('analysis.json')
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("Usage: generate-detailed-report.py <analysis.json>")
+        sys.exit(1)
+    
+    generate_report(sys.argv[1])

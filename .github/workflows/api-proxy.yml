@@ -1,0 +1,42 @@
+name: API Proxy for Analysis Triggers
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - trigger-analysis
+          - check-status
+      payload:
+        description: 'JSON payload'
+        required: true
+        type: string
+
+jobs:
+  proxy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Process request
+      env:
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
+      run: |
+        ACTION="${{ github.event.inputs.action }}"
+        PAYLOAD='${{ github.event.inputs.payload }}'
+        
+        if [ "$ACTION" = "trigger-analysis" ]; then
+          # Parse payload
+          REPO=$(echo "$PAYLOAD" | jq -r '.repository')
+          BRANCH=$(echo "$PAYLOAD" | jq -r '.branch // "main"')
+          MAX_FILES=$(echo "$PAYLOAD" | jq -r '.maxFiles // 500')
+          
+          # Trigger analysis workflow
+          curl -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/${{ github.repository }}/actions/workflows/analyze-on-demand.yml/dispatches \
+            -d "{\"ref\":\"main\",\"inputs\":{\"repository\":\"$REPO\",\"branch\":\"$BRANCH\",\"max_files\":\"$MAX_FILES\"}}"
+        fi
