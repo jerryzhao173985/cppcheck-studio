@@ -36,7 +36,7 @@ def extract_code_context(file_path, line_number, context_lines=5):
         print(f"Error reading {file_path}: {e}")
         return None
 
-def add_code_context_to_analysis(input_file, output_file):
+def add_code_context_to_analysis(input_file, output_file, context_lines=5):
     """Add code context to all issues in the analysis"""
     
     # Load existing analysis
@@ -44,6 +44,8 @@ def add_code_context_to_analysis(input_file, output_file):
         data = json.load(f)
     
     issues = data.get('issues', [])
+    
+    print(f"📂 Processing {len(issues)} issues...")
     
     # Process each issue
     processed = 0
@@ -59,7 +61,7 @@ def add_code_context_to_analysis(input_file, output_file):
             line_number = 0
         
         if file_path and line_number > 0 and os.path.exists(file_path):
-            context = extract_code_context(file_path, line_number)
+            context = extract_code_context(file_path, line_number, context_lines)
             if context:
                 issue['code_context'] = context
                 processed += 1
@@ -72,18 +74,23 @@ def add_code_context_to_analysis(input_file, output_file):
     with open(output_file, 'w') as f:
         json.dump(data, f, indent=2)
     
-    print(f"✅ Code context added to {processed} issues")
-    print(f"⚠️  Skipped {skipped} issues (file not found or invalid line)")
-    print(f"📄 Enhanced analysis saved to: {output_file}")
+    success_rate = (processed / len(issues) * 100) if issues else 0
+    print(f"✅ Successfully added code context to {processed} issues ({success_rate:.1f}%)")
+    if skipped > 0:
+        print(f"⚠️  Skipped {skipped} issues (line 0 or file not found)")
+    print(f"💾 Output written to {output_file}")
 
 if __name__ == '__main__':
     import sys
+    import argparse
     
-    if len(sys.argv) < 2:
-        print("Usage: add-code-context.py <analysis.json> [output.json]")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description='Add code context to cppcheck analysis JSON')
+    parser.add_argument('input_file', help='Input JSON file from cppcheck analysis')
+    parser.add_argument('output_file', nargs='?', default='analysis-with-context.json',
+                       help='Output JSON file with code context (default: analysis-with-context.json)')
+    parser.add_argument('--lines', type=int, default=5,
+                       help='Number of context lines before and after the issue (default: 5)')
     
-    input_file = sys.argv[1]
-    output_file = sys.argv[2] if len(sys.argv) > 2 else 'analysis-with-context.json'
+    args = parser.parse_args()
     
-    add_code_context_to_analysis(input_file, output_file)
+    add_code_context_to_analysis(args.input_file, args.output_file, args.lines)

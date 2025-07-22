@@ -1,0 +1,295 @@
+#!/usr/bin/env python3
+"""
+CPPCheck Studio - Professional C++ Static Analysis Dashboard
+A standalone tool for visualizing cppcheck results
+"""
+
+import argparse
+import subprocess
+import sys
+import os
+import json
+from pathlib import Path
+import shutil
+import tempfile
+
+# Get the directory where this script is located
+SCRIPT_DIR = Path(__file__).parent.resolve()
+
+class CPPCheckStudio:
+    def __init__(self):
+        self.config = self.load_config()
+        
+    def load_config(self):
+        """Load configuration from .cppcheckstudio.json if exists"""
+        config_file = Path.cwd() / '.cppcheckstudio.json'
+        default_config = {
+            'cppcheck': {
+                'enable': 'all',
+                'std': 'c++17',
+                'inconclusive': True,
+                'suppress': []
+            },
+            'dashboard': {
+                'type': 'virtual',  # virtual, robust, minimal
+                'include_code': True,
+                'context_lines': 5
+            }
+        }
+        
+        if config_file.exists():
+            with open(config_file) as f:
+                user_config = json.load(f)
+                # Merge with defaults
+                default_config.update(user_config)
+                
+        return default_config
+    
+    def run_cppcheck(self, paths, output_file='cppcheck_results.xml'):
+        """Run cppcheck analysis on given paths"""
+        print("🔍 Running CPPCheck analysis...")
+        
+        cmd = [
+            'cppcheck',
+            f'--enable={self.config["cppcheck"]["enable"]}',
+            f'--std={self.config["cppcheck"]["std"]}',
+            '--xml',
+            '--xml-version=2'
+        ]
+        
+        if self.config['cppcheck']['inconclusive']:
+            cmd.append('--inconclusive')
+            
+        # Add suppressions
+        for suppress in self.config['cppcheck']['suppress']:
+            cmd.extend(['--suppress', suppress])
+            
+        # Add paths
+        cmd.extend(paths)
+        
+        # Run cppcheck
+        with open(output_file, 'w') as f:
+            result = subprocess.run(cmd, stderr=f, capture_output=True, text=True)
+            
+        if result.returncode != 0 and not Path(output_file).exists():
+            print(f"❌ CPPCheck failed: {result.stdout}")
+            return False
+            
+        print(f"✅ Analysis complete: {output_file}")
+        return True
+    
+    def convert_xml_to_json(self, xml_file, json_file):
+        """Convert cppcheck XML to JSON"""
+        print("📄 Converting XML to JSON...")
+        
+        xml2json_script = SCRIPT_DIR / 'xml2json.py'
+        if not xml2json_script.exists():
+            print("❌ xml2json.py not found!")
+            return False
+            
+        result = subprocess.run([
+            sys.executable, str(xml2json_script), xml_file, json_file
+        ], capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            print(f"❌ Conversion failed: {result.stderr}")
+            return False
+            
+        print(f"✅ Converted to JSON: {json_file}")
+        return True
+    
+    def add_code_context(self, json_file, output_file):
+        """Add code context to issues"""
+        if not self.config['dashboard']['include_code']:
+            shutil.copy(json_file, output_file)
+            return True
+            
+        print("📝 Adding code context...")
+        
+        add_context_script = SCRIPT_DIR / 'add-code-context.py'
+        if not add_context_script.exists():
+            print("❌ add-code-context.py not found!")
+            return False
+            
+        result = subprocess.run([
+            sys.executable, str(add_context_script), 
+            json_file, output_file,
+            '--lines', str(self.config['dashboard']['context_lines'])
+        ], capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            print(f"❌ Failed to add context: {result.stderr}")
+            return False
+            
+        print(f"✅ Added code context: {output_file}")
+        return True
+    
+    def generate_dashboard(self, json_file, output_file):
+        """Generate HTML dashboard"""
+        print("📊 Generating dashboard...")
+        
+        # Choose dashboard generator based on config
+        dashboard_type = self.config['dashboard']['type']
+        
+        generator_map = {
+            'virtual': 'generate-standalone-virtual-dashboard.py',
+            'robust': 'generate-robust-dashboard.py',
+            'minimal': 'generate-production-dashboard.py'
+        }
+        
+        generator_script = SCRIPT_DIR / generator_map.get(dashboard_type, generator_map['virtual'])
+        
+        if not generator_script.exists():
+            print(f"❌ Dashboard generator not found: {generator_script}")
+            return False
+            
+        result = subprocess.run([
+            sys.executable, str(generator_script),
+            json_file, output_file
+        ], capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            print(f"❌ Dashboard generation failed: {result.stderr}")
+            return False
+            
+        print(f"✅ Dashboard generated: {output_file}")
+        return True
+    
+    def analyze(self, paths, output='dashboard.html'):
+        """Run complete analysis pipeline"""
+        # Create temp directory for intermediate files
+        with tempfile.TemporaryDirectory() as tmpdir:
+            xml_file = Path(tmpdir) / 'cppcheck.xml'
+            json_file = Path(tmpdir) / 'analysis.json'
+            context_file = Path(tmpdir) / 'analysis-with-context.json'
+            
+            # Run pipeline
+            if not self.run_cppcheck(paths, xml_file):
+                return False
+                
+            if not self.convert_xml_to_json(xml_file, json_file):
+                return False
+                
+            if not self.add_code_context(json_file, context_file):
+                return False
+                
+            if not self.generate_dashboard(context_file, output):
+                return False
+                
+        # Success!
+        print(f"\n🎉 Analysis complete!")
+        print(f"📊 View dashboard: file://{Path(output).resolve()}")
+        
+        # Open in browser if requested
+        if sys.platform == 'darwin':
+            subprocess.run(['open', output])
+        elif sys.platform == 'linux':
+            subprocess.run(['xdg-open', output])
+        elif sys.platform == 'win32':
+            subprocess.run(['start', output], shell=True)
+            
+        return True
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='CPPCheck Studio - Professional C++ Static Analysis Dashboard',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Analyze current directory
+  cppcheck-studio .
+  
+  # Analyze specific directories
+  cppcheck-studio src/ include/ lib/
+  
+  # Custom output file
+  cppcheck-studio src/ -o report.html
+  
+  # Use minimal dashboard (no code context)
+  cppcheck-studio src/ --type minimal
+  
+  # Initialize config file
+  cppcheck-studio --init
+  
+Configuration:
+  Create .cppcheckstudio.json in your project root:
+  {
+    "cppcheck": {
+      "enable": "all",
+      "std": "c++17",
+      "inconclusive": true,
+      "suppress": ["unusedFunction", "missingInclude"]
+    },
+    "dashboard": {
+      "type": "virtual",
+      "include_code": true,
+      "context_lines": 5
+    }
+  }
+"""
+    )
+    
+    parser.add_argument('paths', nargs='*', default=['.'],
+                       help='Paths to analyze (default: current directory)')
+    parser.add_argument('-o', '--output', default='cppcheck-dashboard.html',
+                       help='Output dashboard file (default: cppcheck-dashboard.html)')
+    parser.add_argument('--type', choices=['virtual', 'robust', 'minimal'],
+                       help='Dashboard type (overrides config)')
+    parser.add_argument('--no-code', action='store_true',
+                       help='Skip code context (faster, smaller)')
+    parser.add_argument('--init', action='store_true',
+                       help='Initialize config file')
+    parser.add_argument('--version', action='version', version='1.0.0')
+    
+    args = parser.parse_args()
+    
+    # Handle --init
+    if args.init:
+        config_file = Path.cwd() / '.cppcheckstudio.json'
+        if config_file.exists():
+            print("⚠️  Config file already exists!")
+            return
+            
+        default_config = {
+            "cppcheck": {
+                "enable": "all",
+                "std": "c++17",
+                "inconclusive": True,
+                "suppress": []
+            },
+            "dashboard": {
+                "type": "virtual",
+                "include_code": True,
+                "context_lines": 5
+            }
+        }
+        
+        with open(config_file, 'w') as f:
+            json.dump(default_config, f, indent=2)
+            
+        print(f"✅ Created {config_file}")
+        return
+    
+    # Check if cppcheck is installed
+    if not shutil.which('cppcheck'):
+        print("❌ Error: cppcheck not found!")
+        print("📦 Install with:")
+        print("   brew install cppcheck     # macOS")
+        print("   apt install cppcheck      # Ubuntu/Debian")
+        print("   choco install cppcheck    # Windows")
+        sys.exit(1)
+    
+    # Run analysis
+    studio = CPPCheckStudio()
+    
+    # Override config with command line args
+    if args.type:
+        studio.config['dashboard']['type'] = args.type
+    if args.no_code:
+        studio.config['dashboard']['include_code'] = False
+        
+    success = studio.analyze(args.paths, args.output)
+    sys.exit(0 if success else 1)
+
+if __name__ == '__main__':
+    main()
