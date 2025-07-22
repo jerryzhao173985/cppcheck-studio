@@ -30,16 +30,30 @@ export function generateScripts(): string {
     // Initialize
     function initialize() {
         try {
+            console.log('🚀 Dashboard initializing...');
             showLoadingStatus('Loading issues data...');
             
             // Load issues from embedded JSONL
             loadEmbeddedData();
+            console.log('📊 Loaded ' + state.allIssues.length + ' issues');
             
             // Set up virtual scrolling
             setupVirtualScroll();
             
-            // Initial render
+            // Initial render - CRITICAL FOR SCROLLING
             filterData();
+            console.log('🎯 Filtered ' + state.filteredIssues.length + ' issues');
+            
+            // Ensure initial render happens
+            setTimeout(() => {
+                renderVisibleRows();
+                // Auto-recovery check
+                if (state.filteredIssues.length > 0 && document.getElementById('issuesBody').children.length === 0) {
+                    console.warn('⚠️ No rows rendered, attempting recovery...');
+                    state.containerHeight = document.getElementById('scrollContainer').clientHeight || 600;
+                    renderVisibleRows();
+                }
+            }, 100);
             
             hideLoadingStatus();
         } catch (error) {
@@ -98,7 +112,10 @@ export function generateScripts(): string {
         
         // Update container height on resize
         const updateContainerHeight = () => {
-            state.containerHeight = scrollContainer.clientHeight - 100; // Account for header
+            // Ensure minimum height for proper scrolling
+            const rect = scrollContainer.getBoundingClientRect();
+            state.containerHeight = Math.max(400, rect.height - 100); // Minimum 400px
+            console.log('Container height updated:', state.containerHeight);
             renderVisibleRows();
         };
         
@@ -397,5 +414,28 @@ export function generateScripts(): string {
     window.setSeverityFilter = setSeverityFilter;
     window.closeModal = closeModal;
     window.debounce = debounce;
+    
+    // Recovery function for troubleshooting
+    window.recoverDashboard = function() {
+        console.log('🔧 Running dashboard recovery...');
+        
+        // Reset state
+        state.scrollTop = 0;
+        state.visibleStart = 0;
+        state.visibleEnd = Math.min(50, state.filteredIssues.length);
+        state.containerHeight = document.getElementById('scrollContainer').clientHeight || 600;
+        
+        // Re-filter and render
+        filterData();
+        renderVisibleRows();
+        
+        // Scroll to top
+        document.getElementById('scrollContainer').scrollTop = 0;
+        
+        console.log('✅ Recovery complete');
+        console.log('Issues available:', state.filteredIssues.length);
+        console.log('Rows rendered:', document.getElementById('issuesBody').children.length);
+        console.log('Container height:', state.containerHeight);
+    };
   `;
 }
