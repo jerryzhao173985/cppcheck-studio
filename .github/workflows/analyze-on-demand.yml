@@ -229,7 +229,7 @@ jobs:
           "files_analyzed": ${{ env.FILE_COUNT }},
           "issues_found": ${{ env.ISSUE_COUNT }},
           "max_files": ${{ env.MAX_FILES_INT }},
-          "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/${{ env.ANALYSIS_ID }}/dashboard.html"
+          "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/${{ env.ANALYSIS_ID }}/index.html"
         }
         EOF
 
@@ -243,6 +243,7 @@ jobs:
           output/report.md
           output/metadata.json
           analysis.json
+          analysis-with-context.json
 
     - name: Update analysis results and status
       if: github.ref == 'refs/heads/main'
