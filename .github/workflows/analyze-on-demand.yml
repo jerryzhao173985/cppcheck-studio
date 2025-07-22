@@ -28,6 +28,12 @@ on:
         required: false
         type: string
 
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+  actions: read
+
 jobs:
   analyze:
     name: Analyze C++ Repository
