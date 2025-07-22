@@ -215,7 +215,12 @@ jobs:
         PROJECT_NAME="${{ env.REPO }}"
         
         # Check which generator to use
-        if [ -f cppcheck-studio/generate/generate-standalone-virtual-dashboard.py ]; then
+        if [ -f cppcheck-studio/generate/generate-simple-dashboard.py ]; then
+          echo "Using simple dashboard generator (no JSONL issues)..."
+          python3 cppcheck-studio/generate/generate-simple-dashboard.py \
+            analysis-with-context.json \
+            output/dashboard-${{ env.ANALYSIS_ID }}.html
+        elif [ -f cppcheck-studio/generate/generate-standalone-virtual-dashboard.py ]; then
           echo "Using Python dashboard generator for better compatibility..."
           python3 cppcheck-studio/generate/generate-standalone-virtual-dashboard.py \
             analysis-with-context.json \
