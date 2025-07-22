@@ -194,13 +194,23 @@ jobs:
         # Create output directory
         mkdir -p output
         
+        # Debug: Show current directory and files
+        echo "Current directory: $(pwd)"
+        echo "Files in current directory:"
+        ls -la | head -10
+        echo "Checking analysis file:"
+        ls -la analysis-with-context.json
+        echo "First few issues:"
+        head -c 1000 analysis-with-context.json
+        
         # Generate dashboard
         PROJECT_NAME="${{ env.REPO }}"
         cppcheck-dashboard \
           analysis-with-context.json \
           output/dashboard-${{ env.ANALYSIS_ID }}.html \
           --title "${PROJECT_NAME} Analysis" \
-          --project "${PROJECT_NAME} (${{ env.COMMIT_SHA }})"
+          --project "${PROJECT_NAME} (${{ env.COMMIT_SHA }})" \
+          --verbose
         
         # Generate summary
         python3 cppcheck-studio/scripts/generate-summary.py analysis.json > output/summary.txt

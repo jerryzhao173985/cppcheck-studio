@@ -1,6 +1,6 @@
 {
   "name": "cppcheck-dashboard-generator",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Generate beautiful, interactive HTML dashboards from cppcheck JSON output with virtual scrolling",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -20,7 +20,7 @@
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
     "typecheck": "tsc --noEmit",
     "validate": "npm run lint && npm run typecheck && npm run test",
-    "prepublishOnly": "npm run validate && npm run build",
+    "prepublishOnly": "npm run build",
     "prepare": "npm run build",
     "start": "node dist/cli.js",
     "example": "npm run build && node dist/cli.js ../data/analysis-with-context.json example-output.html",

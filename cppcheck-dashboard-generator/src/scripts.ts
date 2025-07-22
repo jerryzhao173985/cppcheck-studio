@@ -54,7 +54,7 @@ export function generateScripts(): string {
             // Parse issues data
             const issuesScript = document.getElementById('issuesData');
             const issuesText = issuesScript.textContent.trim();
-            const issuesLines = issuesText.split('\\n').filter(line => line.trim());
+            const issuesLines = issuesText.split('\n').filter(line => line.trim());
             
             state.allIssues = issuesLines.map(line => {
                 try {
@@ -70,7 +70,7 @@ export function generateScripts(): string {
             // Parse code context data
             const codeScript = document.getElementById('codeContextData');
             const codeText = codeScript.textContent.trim();
-            const codeLines = codeText.split('\\n').filter(line => line.trim());
+            const codeLines = codeText.split('\n').filter(line => line.trim());
             
             codeLines.forEach(line => {
                 try {
@@ -311,9 +311,9 @@ export function generateScripts(): string {
                 const lineContent = escapeHtml(line.content || '');
                 
                 if (isTarget) {
-                    content += '<span class="highlight-line">' + lineNum + ': ' + lineContent + '</span>\\n';
+                    content += '<span class="highlight-line">' + lineNum + ': ' + lineContent + '</span>\n';
                 } else {
-                    content += lineNum + ': ' + lineContent + '\\n';
+                    content += lineNum + ': ' + lineContent + '\n';
                 }
             });
             
