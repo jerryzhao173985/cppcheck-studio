@@ -6,7 +6,10 @@ on:
     paths:
       - 'docs/**'
       - '.github/workflows/deploy-docs.yml'
+      - '.github/workflows/analyze-on-demand.yml'  # Deploy when analysis workflow changes
   workflow_dispatch:
+  schedule:
+    - cron: '0 */6 * * *'  # Keep alive every 6 hours
 
 permissions:
   contents: read
