@@ -44,12 +44,12 @@ class StandaloneVirtualDashboardGenerator:
         # Count issues with code context
         with_context = len(code_context_map)
         
-        # Generate JSONL strings
-        issues_jsonl = '\n'.join(json.dumps(issue) for issue in issues_without_context)
+        # Generate JSONL strings with placeholder to avoid JavaScript parsing issues
+        issues_jsonl = '__NEWLINE__'.join(json.dumps(issue) for issue in issues_without_context)
         code_jsonl_entries = []
         for issue_id, context in code_context_map.items():
             code_jsonl_entries.append(json.dumps({'id': issue_id, 'code_context': context}))
-        code_jsonl = '\n'.join(code_jsonl_entries)
+        code_jsonl = '__NEWLINE__'.join(code_jsonl_entries)
         
         # Generate HTML
         html_content = f"""<!DOCTYPE html>
@@ -253,7 +253,7 @@ class StandaloneVirtualDashboardGenerator:
                 // Parse issues data
                 const issuesScript = document.getElementById('issuesData');
                 const issuesText = issuesScript.textContent.trim();
-                const issuesLines = issuesText.split('\\n').filter(line => line.trim());
+                const issuesLines = issuesText.split('__NEWLINE__').filter(line => line.trim());
                 
                 state.allIssues = issuesLines.map(line => {{
                     try {{
@@ -269,7 +269,7 @@ class StandaloneVirtualDashboardGenerator:
                 // Parse code context data
                 const codeScript = document.getElementById('codeContextData');
                 const codeText = codeScript.textContent.trim();
-                const codeLines = codeText.split('\\n').filter(line => line.trim());
+                const codeLines = codeText.split('__NEWLINE__').filter(line => line.trim());
                 
                 codeLines.forEach(line => {{
                     try {{
