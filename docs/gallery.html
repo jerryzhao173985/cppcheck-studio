@@ -244,8 +244,27 @@
     </div>
     
     <script>
-        // Sample data - in production this would come from an API
-        const sampleAnalyses = [
+        // Load real analysis data from API
+        let sampleAnalyses = [];
+        let realAnalyses = [];
+        
+        async function loadRealAnalyses() {
+            try {
+                const response = await fetch('api/gallery.json?t=' + Date.now());
+                if (response.ok) {
+                    const data = await response.json();
+                    realAnalyses = data.analyses || [];
+                    // Combine with sample data
+                    sampleAnalyses = [...realAnalyses];
+                    renderGallery(sampleAnalyses);
+                }
+            } catch (e) {
+                console.log('Using sample data:', e);
+            }
+        }
+        
+        // Sample data as fallback
+        const fallbackAnalyses = [
             {
                 id: 'current',
                 repository: 'jerryzhao173985/cppcheck-studio',
@@ -469,7 +488,12 @@
         
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
+            // Use fallback data initially
+            sampleAnalyses = fallbackAnalyses;
             renderGallery(sampleAnalyses);
+            
+            // Load real data
+            loadRealAnalyses();
             
             // Search functionality
             document.getElementById('searchInput').addEventListener('input', (e) => {
