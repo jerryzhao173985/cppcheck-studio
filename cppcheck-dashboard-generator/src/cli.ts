@@ -18,11 +18,12 @@ program
   .argument('[output]', 'output HTML file (default: standalone-virtual-dashboard.html)')
   .option('-t, --title <title>', 'dashboard title', 'CPPCheck Studio - Virtual Scroll Dashboard')
   .option('-p, --project <name>', 'project name', 'Project')
+  .option('-v, --verbose', 'enable verbose output', false)
   .action(
     async (
       input: string,
       output: string | undefined,
-      options: { title: string; project: string }
+      options: { title: string; project: string; verbose: boolean }
     ) => {
       try {
         // Validate input file exists
@@ -52,6 +53,7 @@ program
           output: outputFile,
           title: options.title,
           projectName: options.project,
+          verbose: options.verbose,
         };
 
         // Generate dashboard
