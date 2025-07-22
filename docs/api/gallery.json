@@ -65,6 +65,17 @@
       "issues_found": 2324,
       "max_files": 1000,
       "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/1753197652500-fx5bj236t/dashboard.html"
+    },
+    {
+      "analysis_id": "1753199396263-kj0l5rt3u",
+      "repository": "jerryzhao173985/lpzrobots",
+      "branch": "main",
+      "commit": "a94aca1",
+      "timestamp": "2025-07-22T15:50:59Z",
+      "files_analyzed": 500,
+      "issues_found": 1665,
+      "max_files": 500,
+      "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/1753199396263-kj0l5rt3u/dashboard.html"
     }
   ]
 }
