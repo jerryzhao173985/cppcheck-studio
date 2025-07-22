@@ -1,0 +1,66 @@
+name: Simple CPPCheck Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    
+    - name: Install and test
+      run: |
+        # Install cppcheck
+        sudo apt-get update
+        sudo apt-get install -y cppcheck
+        
+        # Build dashboard generator
+        cd cppcheck-dashboard-generator
+        npm ci
+        npm run build
+        cd ..
+        
+        # Create test file
+        mkdir -p test-src
+        cat > test-src/test.cpp << 'EOF'
+        #include <iostream>
+        void test() {
+            int* p = nullptr;
+            *p = 5; // Null pointer dereference
+        }
+        EOF
+        
+        # Run analysis
+        cppcheck --enable=all --xml --xml-version=2 test-src 2> test.xml
+        python3 xml2json-simple.py test.xml > test.json
+        
+        # Generate dashboard
+        cd cppcheck-dashboard-generator
+        npx tsx src/cli.ts ../test.json ../test-dashboard.html
+        cd ..
+        
+        # Show results
+        echo "=== Analysis Results ==="
+        python3 scripts/generate-summary.py test.json
+        
+        # Create job summary
+        echo "## ✅ CPPCheck Test Complete" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Results" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        python3 scripts/generate-summary.py test.json >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+    
+    - name: Upload dashboard
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-dashboard
+        path: test-dashboard.html

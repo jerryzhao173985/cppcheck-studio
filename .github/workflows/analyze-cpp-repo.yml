@@ -28,7 +28,6 @@ jobs:
   analyze-external:
     name: Analyze C++ Repository
     runs-on: ubuntu-latest
-    
     steps:
     - name: Checkout CPPCheck Studio
       uses: actions/checkout@v4
@@ -50,8 +49,6 @@ jobs:
         # Install CPPCheck
         sudo apt-get update
         sudo apt-get install -y cppcheck
-        
-        # No Python dependencies needed
         
         # Build and install dashboard generator
         cd cppcheck-studio/cppcheck-dashboard-generator
@@ -134,20 +131,7 @@ jobs:
           --project "${PROJECT_NAME} (${COMMIT_SHA})"
         
         # Generate summary report
-        python3 -c "
-import json
-with open('analysis.json') as f:
-    data = json.load(f)
-    issues = data.get('issues', [])
-    by_severity = {}
-    for issue in issues:
-        sev = issue.get('severity', 'unknown')
-        by_severity[sev] = by_severity.get(sev, 0) + 1
-    
-    print(f'Total issues: {len(issues)}')
-    for sev, count in sorted(by_severity.items()):
-        print(f'  {sev}: {count}')
-" > summary.txt
+        python3 cppcheck-studio/scripts/generate-summary.py analysis.json > summary.txt
         
         cat summary.txt
 
@@ -160,42 +144,18 @@ with open('analysis.json') as f:
           summary.txt
           analysis.json
 
-    - name: Create issue with results
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const fs = require('fs');
-          const summary = fs.readFileSync('summary.txt', 'utf8');
-          
-          const issueBody = `## CPPCheck Analysis Results for ${context.payload.inputs.repository}
-          
-          **Repository:** https://github.com/${context.payload.inputs.repository}
-          **Branch:** ${context.payload.inputs.branch}
-          **Commit:** ${process.env.COMMIT_SHA}
-          **Path:** ${context.payload.inputs.path || 'entire repository'}
-          **Files analyzed:** ${context.payload.inputs.max_files}
-          
-          ### Summary
-          \`\`\`
-          ${summary}
-          \`\`\`
-          
-          ### Dashboard
-          The interactive dashboard is available as an artifact:
-          [Download Dashboard](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts)
-          
-          ### View Online
-          After downloading, open the HTML file in your browser to explore:
-          - Filter by severity
-          - Search through issues  
-          - View code context
-          - Virtual scrolling for large result sets
-          `;
-          
-          await github.rest.issues.create({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            title: `CPPCheck Analysis: ${context.payload.inputs.repository}`,
-            body: issueBody,
-            labels: ['cppcheck-analysis', 'automated']
-          });
+    - name: Create job summary
+      run: |
+        echo "## 📊 CPPCheck Analysis Complete" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Repository:** ${{ github.event.inputs.repository }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Branch:** ${{ github.event.inputs.branch }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Commit:** ${COMMIT_SHA}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Results Summary" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        cat summary.txt >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📥 Dashboard Download" >> $GITHUB_STEP_SUMMARY
+        echo "[Download Interactive Dashboard](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts)" >> $GITHUB_STEP_SUMMARY
