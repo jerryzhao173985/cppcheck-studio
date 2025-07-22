@@ -614,16 +614,23 @@
                     <p style="margin: 20px 0;">Your analysis has been queued! Click below to trigger it:</p>
                     
                     <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                        <p style="font-weight: 600; margin-bottom: 15px;">Repository to analyze: <code style="background: #e5e7eb; padding: 4px 8px; border-radius: 4px;">${repo}</code></p>
+                        
                         <a href="${result.dispatchUrl}" 
                            target="_blank" 
                            class="analyze-btn" 
                            style="display: inline-flex; margin-bottom: 15px;">
                             <span>🎯</span>
-                            <span>Trigger Analysis on GitHub</span>
+                            <span>Go to GitHub Workflow Page</span>
                         </a>
                         
-                        <ol style="margin: 10px 0; padding-left: 20px; color: #4b5563;">
-                            ${result.instructions.map(step => `<li style="margin: 5px 0;">${step}</li>`).join('')}
+                        <h4 style="margin-top: 20px; margin-bottom: 10px;">📋 Quick Instructions:</h4>
+                        <ol style="margin: 10px 0; padding-left: 20px; color: #4b5563; line-height: 1.8;">
+                            <li>Click the button above to open GitHub</li>
+                            <li>Click the <strong>"Run workflow"</strong> dropdown button</li>
+                            <li>In the repository field, enter: <code style="background: #e5e7eb; padding: 2px 6px; border-radius: 3px;">${repo}</code></li>
+                            <li>Click the green <strong>"Run workflow"</strong> button</li>
+                            <li>The analysis will start immediately!</li>
                         </ol>
                     </div>
                     

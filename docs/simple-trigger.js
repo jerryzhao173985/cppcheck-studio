@@ -1,7 +1,8 @@
 // Simple trigger mechanism using GitHub workflow dispatch
 class SimpleTrigger {
     constructor() {
-        this.workflowUrl = 'https://github.com/jerryzhao173985/cppcheck-studio/actions/workflows/process-analysis-request.yml';
+        // Direct link to the actual analysis workflow
+        this.workflowUrl = 'https://github.com/jerryzhao173985/cppcheck-studio/actions/workflows/analyze-on-demand.yml';
         this.apiBase = 'https://jerryzhao173985.github.io/cppcheck-studio/api';
     }
     
@@ -26,10 +27,11 @@ class SimpleTrigger {
             analysisId,
             dispatchUrl,
             instructions: [
-                'Click the button below to trigger analysis',
-                'On the GitHub page, click "Run workflow"',
-                'The repository field will be pre-filled',
-                'Click the green "Run workflow" button'
+                'Click the button to open GitHub workflow page',
+                'Click "Run workflow" dropdown',
+                'Enter the repository name in the field',
+                'Click the green "Run workflow" button',
+                'Analysis will start processing your repository'
             ]
         };
     }
