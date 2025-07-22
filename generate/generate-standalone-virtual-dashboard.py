@@ -229,16 +229,52 @@ class StandaloneVirtualDashboardGenerator:
         // Initialize
         function initialize() {{
             try {{
+                console.log('🚀 Dashboard initializing...');
                 showLoadingStatus('Loading issues data...');
                 
                 // Load issues from embedded JSONL
                 loadEmbeddedData();
+                console.log('📊 Loaded ' + state.allIssues.length + ' issues');
                 
                 // Set up virtual scrolling
                 setupVirtualScroll();
                 
-                // Initial render
+                // Initial render - CRITICAL FOR SCROLLING
                 filterData();
+                console.log('🎯 Filtered ' + state.filteredIssues.length + ' issues');
+                
+                // Multiple recovery attempts to ensure rendering
+                const attemptRender = (attempt = 1) => {{
+                    renderVisibleRows();
+                    const tbody = document.getElementById('issuesBody');
+                    
+                    if (state.filteredIssues.length > 0 && tbody && tbody.children.length === 0) {{
+                        console.warn('⚠️ Attempt ' + attempt + ': No rows rendered, retrying...');
+                        
+                        // Force container height recalculation
+                        const scrollContainer = document.getElementById('scrollContainer');
+                        if (scrollContainer) {{
+                            const rect = scrollContainer.getBoundingClientRect();
+                            state.containerHeight = Math.max(400, rect.height || 600);
+                            console.log('Recalculated container height:', state.containerHeight);
+                        }}
+                        
+                        if (attempt < 3) {{
+                            setTimeout(() => attemptRender(attempt + 1), 200 * attempt);
+                        }} else {{
+                            console.error('❌ Failed to render after 3 attempts');
+                            // Force manual recovery
+                            if (window.recoverDashboard) {{
+                                window.recoverDashboard();
+                            }}
+                        }}
+                    }} else if (tbody && tbody.children.length > 0) {{
+                        console.log('✅ Successfully rendered ' + tbody.children.length + ' rows');
+                    }}
+                }};
+                
+                // Start render attempts after DOM settles
+                setTimeout(() => attemptRender(), 100);
                 
                 hideLoadingStatus();
             }} catch (error) {{
@@ -297,7 +333,10 @@ class StandaloneVirtualDashboardGenerator:
             
             // Update container height on resize
             const updateContainerHeight = () => {{
-                state.containerHeight = scrollContainer.clientHeight - 100; // Account for header
+                // Ensure minimum height for proper virtual scrolling
+                const height = scrollContainer.clientHeight || scrollContainer.offsetHeight || 600;
+                state.containerHeight = Math.max(400, height - 100); // Account for header with minimum
+                console.log('Container height:', state.containerHeight);
                 renderVisibleRows();
             }};
             
@@ -582,6 +621,67 @@ class StandaloneVirtualDashboardGenerator:
             if (event.target === modal) {{
                 closeModal();
             }}
+        }};
+        
+        // Recovery function for troubleshooting
+        window.recoverDashboard = function() {{
+            console.log('🔧 Running comprehensive dashboard recovery...');
+            
+            // Force recalculate container dimensions
+            const scrollContainer = document.getElementById('scrollContainer');
+            if (!scrollContainer) {{
+                console.error('❌ Scroll container not found!');
+                return;
+            }}
+            
+            // Ensure container has proper height
+            if (!scrollContainer.style.height || scrollContainer.style.height === '0px') {{
+                scrollContainer.style.height = '600px';
+                scrollContainer.style.minHeight = '400px';
+                console.log('📐 Applied default container height');
+            }}
+            
+            // Get fresh measurements
+            const rect = scrollContainer.getBoundingClientRect();
+            const computedStyle = window.getComputedStyle(scrollContainer);
+            
+            // Reset state with valid values
+            state.scrollTop = 0;
+            state.visibleStart = 0;
+            state.visibleEnd = Math.min(50, state.filteredIssues.length);
+            state.containerHeight = Math.max(400, rect.height || 600);
+            
+            console.log('📊 Recovery state:', {{
+                issues: state.allIssues.length,
+                filtered: state.filteredIssues.length,
+                containerHeight: state.containerHeight,
+                containerStyle: {{
+                    height: computedStyle.height,
+                    minHeight: computedStyle.minHeight,
+                    maxHeight: computedStyle.maxHeight,
+                    overflow: computedStyle.overflow
+                }}
+            }});
+            
+            // Re-filter and render
+            filterData();
+            
+            // Force multiple render attempts
+            let rendered = false;
+            for (let i = 0; i < 3; i++) {{
+                renderVisibleRows();
+                const tbody = document.getElementById('issuesBody');
+                if (tbody && tbody.children.length > 0) {{
+                    rendered = true;
+                    break;
+                }}
+                console.log('Recovery render attempt ' + (i + 1) + ' failed, retrying...');
+            }}
+            
+            // Scroll to top
+            scrollContainer.scrollTop = 0;
+            
+            console.log(rendered ? '✅ Recovery complete!' : '❌ Recovery failed after 3 attempts');
         }};
         
         // Initialize when DOM is ready
