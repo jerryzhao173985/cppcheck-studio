@@ -798,11 +798,21 @@ class OptimizedDashboardGenerator:
 <body>
     <div class="header">
         <div class="header-content">
-            <h1 class="title">
-                <span>🛡️</span>
-                <span>Code Analysis Dashboard</span>
-            </h1>
-            <div class="stats-bar" id="statsBar">
+            <div style="display: flex; align-items: center; gap: 2rem; flex-wrap: wrap; justify-content: space-between; width: 100%;">
+                <h1 class="title">
+                    <span>🛡️</span>
+                    <span>Code Analysis Dashboard</span>
+                </h1>
+                <div style="display: flex; gap: 1rem; align-items: center;">
+                    <a href="../../gallery.html" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.1); border-radius: 0.5rem; color: var(--text-primary); text-decoration: none; font-size: 0.875rem; transition: all 0.2s;">
+                        ← Back to Gallery
+                    </a>
+                    <a href="../../index.html" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.1); border-radius: 0.5rem; color: var(--text-primary); text-decoration: none; font-size: 0.875rem; transition: all 0.2s;">
+                        🏠 Home
+                    </a>
+                </div>
+            </div>
+            <div class="stats-bar" id="statsBar" style="margin-top: 1rem;">
                 <div class="stat-badge total" onclick="filterBySeverity('all')">
                     <span>Total</span>
                     <span>{self.stats['total']}</span>
@@ -1552,7 +1562,7 @@ Actions:
 
 def main():
     if len(sys.argv) != 3:
-        print("Usage: python generate-optimized-dashboard-fixed.py <input.json> <output.html>")
+        print("Usage: python generate-optimized-dashboard.py <input.json> <output.html>")
         sys.exit(1)
     
     input_file = sys.argv[1]
