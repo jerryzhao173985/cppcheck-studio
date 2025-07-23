@@ -103,35 +103,39 @@ jobs:
         
         # Define status update function
         cat > status_updates/update_status.sh << 'EOF'
-        #!/bin/bash
-        update_analysis_status() {
-            local status=$1
-            local message=$2
-            local step=$3
-            
-            cat > status_updates/current_status.json << EOJSON
-        {
-          "analysis_id": "${ANALYSIS_ID}",
-          "repository": "${REPO}",
-          "status": "${status}",
-          "step": "${step}",
-          "workflow_run_id": "${{ github.run_id }}",
-          "workflow_run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-          "updated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-          "message": "${message}",
-          "progress": {
-            "steps_completed": ${STEPS_COMPLETED:-0},
-            "total_steps": 5,
-            "current_step": "${step}",
-            "files_found": ${FILE_COUNT:-0},
-            "issues_found": ${ISSUE_COUNT:-0}
-          }
-        }
-        EOJSON
-            
-            echo "📊 Status Update: ${status} - ${message}"
-        }
-        EOF
+#!/bin/bash
+update_analysis_status() {
+    local status=$1
+    local message=$2
+    local step=$3
+    
+    # Use absolute path to ensure we write to the correct location
+    STATUS_DIR="$GITHUB_WORKSPACE/status_updates"
+    mkdir -p "$STATUS_DIR"
+    
+    cat > "$STATUS_DIR/current_status.json" << EOJSON
+{
+  "analysis_id": "${ANALYSIS_ID}",
+  "repository": "${REPO}",
+  "status": "${status}",
+  "step": "${step}",
+  "workflow_run_id": "${{ github.run_id }}",
+  "workflow_run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+  "updated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "message": "${message}",
+  "progress": {
+    "steps_completed": ${STEPS_COMPLETED:-0},
+    "total_steps": 5,
+    "current_step": "${step}",
+    "files_found": ${FILE_COUNT:-0},
+    "issues_found": ${ISSUE_COUNT:-0}
+  }
+}
+EOJSON
+    
+    echo "📊 Status Update: ${status} - ${message}"
+}
+EOF
         
         chmod +x status_updates/update_status.sh
         source status_updates/update_status.sh
@@ -363,8 +367,8 @@ except:
         mkdir -p docs/api/status
         
         # Copy latest status if it exists
-        if [ -f ../status_updates/current_status.json ]; then
-          cp ../status_updates/current_status.json docs/api/status/${{ env.ANALYSIS_ID }}.json
+        if [ -f "$GITHUB_WORKSPACE/status_updates/current_status.json" ]; then
+          cp "$GITHUB_WORKSPACE/status_updates/current_status.json" docs/api/status/${{ env.ANALYSIS_ID }}.json
         else
           # Fallback status
           cat > docs/api/status/${{ env.ANALYSIS_ID }}.json << EOF
