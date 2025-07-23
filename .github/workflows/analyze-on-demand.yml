@@ -401,9 +401,9 @@ jobs:
         # Add code context
         echo "📝 Adding code context..."
         # Get current directory path - this is where target-repo is located
-        BASE_PATH=$(pwd)
+        BASE_PATH=$(pwd)/target-repo
         echo "BASE_PATH=${BASE_PATH}" >> $GITHUB_ENV
-        echo "📁 Base path: $BASE_PATH"
+        echo "📁 Base path for code context: $BASE_PATH"
         
         # The repository path for reference
         REPO_PATH=$(pwd)/target-repo
