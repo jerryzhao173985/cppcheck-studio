@@ -1,11 +1,17 @@
 # CPPCheck Studio - Technical Documentation
 
+> **Last Updated**: July 23, 2025  
+> **Version**: 2.0 (Post-Session Enhancements)
+
 ## Table of Contents
 1. [Architecture Overview](#architecture-overview)
 2. [How Virtual Scrolling Works](#how-virtual-scrolling-works)
 3. [Implementation Details](#implementation-details)
 4. [Performance Optimizations](#performance-optimizations)
 5. [Data Formats](#data-formats)
+6. [CI/CD Workflow](#cicd-workflow)
+7. [Progress Tracking System](#progress-tracking-system)
+8. [Gallery Implementation](#gallery-implementation)
 
 ## Architecture Overview
 
@@ -27,7 +33,13 @@ cppcheck-dashboard-generator/
 generate/
 ├── generate-standalone-virtual-dashboard.py  # Virtual scrolling version
 ├── generate-ultimate-dashboard.py            # Optimized for <5000 issues
-└── add-code-context.py                      # Adds code snippets
+├── generate-optimized-dashboard.py          # Fixed version with proper field mapping
+└── add-code-context.py                      # Adds code snippets with path resolution
+
+scripts/
+├── extract-issue-breakdown.py               # Parses issues by severity
+├── generate-summary.py                      # Creates analysis summary
+└── generate-detailed-report.py              # Markdown report generator
 ```
 
 ## How Virtual Scrolling Works
@@ -285,6 +297,171 @@ Separate JSONL for code context (reduces main data size):
 
 ### Why TypeScript AND Python?
 1. **Ecosystem Choice** - npm vs pip users
+2. **Legacy Support** - Python scripts were original implementation
+3. **Flexibility** - Different deployment scenarios
+4. **Testing** - Cross-validation between implementations
+
+## CI/CD Workflow
+
+### Workflow Architecture
+```yaml
+name: On-Demand Repository Analysis
+on:
+  repository_dispatch:
+    types: [analyze-repo]
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: 'GitHub repository to analyze'
+```
+
+### Error Handling Strategy
+1. **Fail-Fast**: `set -e` stops on first error
+2. **Validation**: Check files exist before processing
+3. **Fallbacks**: Use original if enhanced version fails
+4. **Logging**: Detailed output at each step
+
+### Key Improvements
+- File size validation for XML/JSON
+- Multiple path resolution strategies
+- Status updates pushed immediately
+- Emergency minimal dashboard on failure
+
+## Progress Tracking System
+
+### 5-Stage Progress Model
+```javascript
+const stages = {
+  initializing: { percent: 0, message: "Analysis request received" },
+  cloning: { percent: 20, message: "Cloning repository..." },
+  searching: { percent: 40, message: "Searching for C++ files..." },
+  analyzing: { percent: 60, message: "Running static analysis..." },
+  generating: { percent: 80, message: "Generating dashboard..." },
+  completed: { percent: 100, message: "Analysis complete!" }
+};
+```
+
+### Status Update Flow
+1. **Workflow creates status JSON**
+2. **Pushes to GitHub Pages immediately**
+3. **Frontend polls status endpoint**
+4. **Updates UI with progress details**
+
+### Enhanced Status Object
+```json
+{
+  "status": "running",
+  "step": "analyzing",
+  "progress": {
+    "steps_completed": 3,
+    "total_steps": 5,
+    "files_found": 234,
+    "issues_found": 567
+  },
+  "message": "Found 234 C++ files, analyzing..."
+}
+```
+
+## Gallery Implementation
+
+### Data Normalization
+Handles multiple formats from different generator versions:
+```javascript
+function normalizeAnalysisData(analysis) {
+  return {
+    // Field name variations
+    filesAnalyzed: analysis.filesAnalyzed || analysis.files_analyzed,
+    
+    // Issue breakdown handling
+    issues: analysis.issues || {
+      total: analysis.issues_found || 0,
+      error: 0, warning: 0, style: 0, performance: 0
+    },
+    
+    // URL corrections
+    dashboardUrl: analysis.dashboardUrl
+      ?.replace('/dashboard.html', '/index.html')
+  };
+}
+```
+
+### Repository Grouping
+Groups analyses by repository with trend visualization:
+```javascript
+repoGroups[repo] = {
+  name: repo,
+  analyses: [...],
+  totalIssues: sum,
+  latestIssues: latest.issues.total,
+  trend: last5.map(a => a.issues.total)
+};
+```
+
+### Performance Optimizations
+- Virtual list for large gallery
+- Lazy loading of analysis details
+- Caching normalized data
+- Debounced search/filter
+
+## Security Considerations
+
+### Input Validation
+- Sanitize all user inputs
+- Validate repository names
+- Escape HTML in messages
+- Limit file counts
+
+### API Security
+- No secrets in frontend
+- Public data only
+- Rate limiting via GitHub
+- CORS handled by Pages
+
+## Debugging Guide
+
+### Common Issues
+
+1. **Empty Dashboard**
+   - Check browser console for parsing errors
+   - Verify JSON structure in analysis file
+   - Look for JSONL vs JSON format issues
+
+2. **Progress Not Updating**
+   - Check status file creation in workflow
+   - Verify GitHub Pages deployment
+   - Look for polling errors in console
+
+3. **Gallery Not Loading**
+   - Check api/gallery.json exists
+   - Verify data normalization
+   - Look for field name mismatches
+
+### Debug Mode
+Enable with URL parameter: `?debug=true`
+- Shows raw API responses
+- Logs all state changes
+- Displays timing information
+
+## Future Enhancements
+
+### Planned Features
+1. **Incremental Analysis** - Only analyze changed files
+2. **Diff View** - Compare analyses over time
+3. **Custom Rules** - User-defined CPPCheck configurations
+4. **Export Options** - PDF, CSV, SARIF formats
+5. **Team Features** - Shared dashboards, comments
+
+### Performance Goals
+- Support 1M+ issues
+- Sub-100ms search
+- Instant filtering
+- Progressive loading
+
+### Architecture Evolution
+- WebAssembly for parsing
+- Service Worker caching
+- IndexedDB for large datasets
+- Streaming processing
 2. **Integration Options** - Node.js vs Python projects
 3. **Learning Curve** - Use familiar language
 4. **Feature Parity** - Both are complete solutions

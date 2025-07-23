@@ -265,18 +265,18 @@ jobs:
         echo "📊 JSON file size: ${JSON_SIZE} bytes"
         
         # Get issue count safely
-        ISSUE_COUNT=$(python3 -c "
+        ISSUE_COUNT=$(python3 -c '
 import json
 import sys
 try:
-    with open('analysis.json', 'r') as f:
+    with open("analysis.json", "r") as f:
         data = json.load(f)
-    issues = data.get('issues', [])
+    issues = data.get("issues", [])
     print(len(issues))
 except Exception as e:
-    print(f'Error reading analysis.json: {e}', file=sys.stderr)
-    print('0')
-" || echo "0")
+    print(f"Error reading analysis.json: {e}", file=sys.stderr)
+    print("0")
+' || echo "0")
         
         echo "ISSUE_COUNT=${ISSUE_COUNT}" >> $GITHUB_ENV
         echo "📊 Found ${ISSUE_COUNT} issues"
@@ -302,15 +302,15 @@ except Exception as e:
         
         # Show first few files for debugging
         echo "📄 Sample files from analysis:"
-        python3 -c "
+        python3 -c '
 import json
-with open('../analysis.json', 'r') as f:
+with open("../analysis.json", "r") as f:
     data = json.load(f)
-    files = set(issue.get('file', '') for issue in data.get('issues', [])[:10])
+    files = set(issue.get("file", "") for issue in data.get("issues", [])[:10])
     for f in list(files)[:5]:
         if f:
-            print(f'  - {f}')
-" || echo "Could not list files"
+            print(f"  - {f}")
+' || echo "Could not list files"
         
         python3 ../cppcheck-studio/add-code-context.py ../analysis.json ../analysis-with-context.json --base-path "$REPO_PATH" || {
           echo "⚠️ Failed to add code context, using original analysis"

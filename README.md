@@ -26,10 +26,13 @@ Battle-tested generators with multiple dashboard styles and zero dependencies.
 
 Both create identical, stunning dashboards featuring:
 - **🚀 Virtual Scrolling** - Smoothly handle 100,000+ issues
-- **📊 Interactive Statistics** - Visual severity breakdown
-- **🔍 Real-time Search** - Instant filtering
-- **📝 Code Preview** - See issues in context
+- **📊 Interactive Statistics** - Visual severity breakdown with error/warning/style/performance
+- **🔍 Real-time Search** - Instant filtering across all fields
+- **📝 Code Preview** - See issues in context with surrounding lines
 - **📦 Standalone HTML** - Works offline, no server needed
+- **🔄 Real-time Progress** - 5-stage progress tracking during analysis
+- **🎨 Beautiful Gallery** - Browse all analyses with trend visualization
+- **🔗 Navigation Links** - Easy navigation between dashboards and gallery
 
 ## 🚀 Quick Start
 
@@ -205,9 +208,10 @@ await generator.generate();
 
 1. **standalone-virtual** - Best for 5,000+ issues
 2. **ultimate** - Best for <5,000 issues  
-3. **production** - Minimal size, no code
-4. **robust** - Enhanced error handling
-5. **split** - Separate data files
+3. **optimized** - Developer-focused with fixed field mapping
+4. **production** - Minimal size, no code
+5. **robust** - Enhanced error handling
+6. **split** - Separate data files
 
 ## 🚨 Troubleshooting
 
