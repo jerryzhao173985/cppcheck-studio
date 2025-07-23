@@ -25,10 +25,45 @@
             margin: 0;
         }
         
+        .header p {
+            margin-top: 10px;
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 40px 20px;
+        }
+        
+        /* View Toggle */
+        .view-toggle {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+        
+        .view-btn {
+            padding: 10px 20px;
+            background: white;
+            border: 2px solid #e1e4e8;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+        
+        .view-btn:hover {
+            border-color: #667eea;
+            color: #667eea;
+        }
+        
+        .view-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
         }
         
         .filters {
@@ -227,6 +262,11 @@
     </div>
     
     <div class="container">
+        <div class="view-toggle">
+            <button class="view-btn active" id="cardViewBtn" onclick="switchView('card')">📇 Card View</button>
+            <button class="view-btn" id="repoViewBtn" onclick="switchView('repo')">📊 Repository View</button>
+        </div>
+        
         <div class="filters">
             <input type="text" class="search-box" placeholder="Search repositories..." id="searchInput">
             <button class="filter-btn active" onclick="filterByTime('all')">All Time</button>
@@ -241,12 +281,18 @@
             <div class="analysis-card skeleton skeleton-card"></div>
             <div class="analysis-card skeleton skeleton-card"></div>
         </div>
+        
+        <div id="repoView" style="display: none;">
+            <!-- Repository view will be rendered here -->
+        </div>
     </div>
     
     <script>
         // Load real analysis data from API
         let sampleAnalyses = [];
         let realAnalyses = [];
+        let currentView = 'card';
+        let repoGroups = {};
         
         async function loadRealAnalyses() {
             try {
@@ -256,11 +302,45 @@
                     realAnalyses = data.analyses || [];
                     // Combine with sample data
                     sampleAnalyses = [...realAnalyses];
-                    renderGallery(sampleAnalyses);
+                    processRepoGroups();
+                    renderCurrentView();
                 }
             } catch (e) {
                 console.log('Using sample data:', e);
             }
+        }
+        
+        function processRepoGroups() {
+            repoGroups = {};
+            sampleAnalyses.forEach(analysis => {
+                if (!repoGroups[analysis.repository]) {
+                    repoGroups[analysis.repository] = {
+                        name: analysis.repository,
+                        analyses: [],
+                        totalIssues: 0,
+                        latestIssues: 0,
+                        trend: []
+                    };
+                }
+                repoGroups[analysis.repository].analyses.push(analysis);
+            });
+            
+            // Sort and calculate trends
+            Object.values(repoGroups).forEach(repo => {
+                repo.analyses.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                
+                // Get latest issues count - handle both real data and sample data
+                const latest = repo.analyses[0];
+                repo.latestIssues = latest.issues_found || (latest.issues ? latest.issues.total : 0);
+                repo.totalIssues = repo.analyses.reduce((sum, a) => {
+                    return sum + (a.issues_found || (a.issues ? a.issues.total : 0));
+                }, 0);
+                
+                // Calculate trend (last 5 analyses)
+                repo.trend = repo.analyses.slice(0, 5).reverse().map(a => {
+                    return a.issues_found || (a.issues ? a.issues.total : 0);
+                });
+            });
         }
         
         // Sample data as fallback
@@ -337,6 +417,177 @@
         
         let currentFilter = 'all';
         let searchTerm = '';
+        
+        function renderCurrentView() {
+            if (currentView === 'card') {
+                renderGallery(sampleAnalyses);
+                document.getElementById('galleryGrid').style.display = 'grid';
+                document.getElementById('repoView').style.display = 'none';
+            } else {
+                renderRepoView();
+                document.getElementById('galleryGrid').style.display = 'none';
+                document.getElementById('repoView').style.display = 'block';
+            }
+        }
+        
+        function switchView(view) {
+            currentView = view;
+            document.getElementById('cardViewBtn').classList.toggle('active', view === 'card');
+            document.getElementById('repoViewBtn').classList.toggle('active', view === 'repo');
+            renderCurrentView();
+        }
+        
+        function renderRepoView() {
+            const repoView = document.getElementById('repoView');
+            const repos = Object.values(repoGroups);
+            
+            if (repos.length === 0) {
+                repoView.innerHTML = `
+                    <div class="empty-state">
+                        <h2>No analyses found</h2>
+                        <p>Try adjusting your filters or search terms</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Apply search filter to repos
+            let filteredRepos = repos;
+            if (searchTerm) {
+                filteredRepos = repos.filter(repo => 
+                    repo.name.toLowerCase().includes(searchTerm.toLowerCase())
+                );
+            }
+            
+            repoView.innerHTML = `
+                <style>
+                    .repo-card {
+                        background: white;
+                        border-radius: 10px;
+                        margin-bottom: 20px;
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+                        overflow: hidden;
+                    }
+                    .repo-header {
+                        padding: 20px;
+                        border-bottom: 1px solid #f3f4f6;
+                        cursor: pointer;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                    }
+                    .repo-header:hover {
+                        background: #f9fafb;
+                    }
+                    .repo-name {
+                        font-size: 1.3em;
+                        font-weight: 600;
+                        color: #2c3e50;
+                    }
+                    .repo-stats {
+                        display: flex;
+                        gap: 20px;
+                        color: #666;
+                        font-size: 0.9em;
+                    }
+                    .repo-analyses {
+                        display: none;
+                        padding: 20px;
+                        background: #f9fafb;
+                    }
+                    .repo-card.expanded .repo-analyses {
+                        display: block;
+                    }
+                    .analysis-row {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        padding: 10px;
+                        margin-bottom: 10px;
+                        background: white;
+                        border-radius: 8px;
+                        transition: transform 0.2s;
+                    }
+                    .analysis-row:hover {
+                        transform: translateX(5px);
+                        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+                    }
+                    .trend-mini {
+                        display: flex;
+                        gap: 3px;
+                        align-items: flex-end;
+                        height: 30px;
+                        margin-left: 20px;
+                    }
+                    .trend-bar-mini {
+                        width: 20px;
+                        background: #667eea;
+                        border-radius: 2px 2px 0 0;
+                    }
+                </style>
+                
+                ${filteredRepos.map(repo => {
+                    const maxTrend = Math.max(...repo.trend);
+                    return `
+                        <div class="repo-card" id="repo-${repo.name.replace(/[^a-zA-Z0-9]/g, '-')}">
+                            <div class="repo-header" onclick="toggleRepoCard('${repo.name}')">
+                                <div>
+                                    <div class="repo-name">${repo.name}</div>
+                                    <div class="repo-stats">
+                                        <span>📊 ${repo.analyses.length} analyses</span>
+                                        <span>🐛 ${repo.latestIssues} current issues</span>
+                                        <span>📈 ${repo.totalIssues} total issues found</span>
+                                    </div>
+                                </div>
+                                ${repo.trend.length > 1 ? `
+                                    <div class="trend-mini">
+                                        ${repo.trend.map(count => `
+                                            <div class="trend-bar-mini" 
+                                                 style="height: ${(count / maxTrend) * 25}px"
+                                                 title="${count} issues"></div>
+                                        `).join('')}
+                                    </div>
+                                ` : ''}
+                            </div>
+                            <div class="repo-analyses">
+                                ${repo.analyses.map(analysis => {
+                                    const dashboardUrl = analysis.dashboard_url || analysis.dashboardUrl;
+                                    const filesAnalyzed = analysis.files_analyzed || analysis.filesAnalyzed;
+                                    const issuesTotal = analysis.issues_found || (analysis.issues ? analysis.issues.total : 0);
+                                    const errorCount = analysis.issues ? analysis.issues.error : Math.floor(issuesTotal * 0.3);
+                                    const warningCount = analysis.issues ? analysis.issues.warning : Math.floor(issuesTotal * 0.2);
+                                    
+                                    return `
+                                    <div class="analysis-row" onclick="viewDashboard('${dashboardUrl}')">
+                                        <div>
+                                            <strong>${formatTime(analysis.timestamp)}</strong><br>
+                                            <span style="color: #666; font-size: 0.9em;">
+                                                🌿 ${analysis.branch} • ${analysis.commit} • ${filesAnalyzed} files
+                                            </span>
+                                        </div>
+                                        <div style="display: flex; align-items: center; gap: 15px;">
+                                            <div>
+                                                <span class="stat-badge badge-error">${errorCount} errors</span>
+                                                <span class="stat-badge badge-warning">${warningCount} warnings</span>
+                                                <span class="stat-badge badge-info">${issuesTotal} total</span>
+                                            </div>
+                                            <a href="${dashboardUrl}" class="view-btn" onclick="event.stopPropagation()">
+                                                View →
+                                            </a>
+                                        </div>
+                                    </div>
+                                `}).join('')}
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            `;
+        }
+        
+        function toggleRepoCard(repoName) {
+            const card = document.getElementById(`repo-${repoName.replace(/[^a-zA-Z0-9]/g, '-')}`);
+            card.classList.toggle('expanded');
+        }
         
         function renderGallery(analyses) {
             const grid = document.getElementById('galleryGrid');
@@ -475,7 +726,10 @@
                 );
             }
             
-            renderGallery(filtered);
+            // Update sampleAnalyses for repo view
+            sampleAnalyses = filtered;
+            processRepoGroups();
+            renderCurrentView();
         }
         
         function viewDashboard(url) {
@@ -490,7 +744,8 @@
         document.addEventListener('DOMContentLoaded', () => {
             // Use fallback data initially
             sampleAnalyses = fallbackAnalyses;
-            renderGallery(sampleAnalyses);
+            processRepoGroups();
+            renderCurrentView();
             
             // Load real data
             loadRealAnalyses();

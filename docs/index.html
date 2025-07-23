@@ -151,6 +151,108 @@
             border: 1px solid #fca5a5;
         }
         
+        /* Timeline Styles */
+        .analysis-timeline {
+            margin-top: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            display: none;
+        }
+        
+        .timeline-steps {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 40px;
+            position: relative;
+        }
+        
+        .timeline-steps::before {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #e5e7eb;
+            z-index: 0;
+        }
+        
+        .timeline-step {
+            flex: 1;
+            text-align: center;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .step-icon {
+            width: 40px;
+            height: 40px;
+            background: #e5e7eb;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 10px;
+            font-size: 1.2em;
+            transition: all 0.3s;
+            position: relative;
+        }
+        
+        .step-icon.active {
+            background: #fbbf24;
+            color: white;
+            animation: pulse 2s infinite;
+        }
+        
+        .step-icon.completed {
+            background: #10b981;
+            color: white;
+        }
+        
+        .step-label {
+            font-size: 0.85em;
+            color: #6b7280;
+        }
+        
+        .timeline-progress {
+            position: absolute;
+            top: 20px;
+            left: 0;
+            height: 2px;
+            background: #10b981;
+            transition: width 0.5s ease;
+            z-index: 0;
+        }
+        
+        .timeline-details {
+            background: #f9fafb;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        .timeline-details h4 {
+            margin: 0 0 10px 0;
+            color: #374151;
+        }
+        
+        .timeline-details p {
+            margin: 5px 0;
+            color: #6b7280;
+            font-size: 0.9em;
+        }
+        
+        .timeline-details a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        
+        .timeline-details a:hover {
+            text-decoration: underline;
+        }
+        
         .spinner {
             width: 20px;
             height: 20px;
@@ -416,6 +518,34 @@
             
             <div class="status-message" id="statusMessage"></div>
             
+            <!-- Analysis Timeline -->
+            <div class="analysis-timeline" id="analysisTimeline">
+                <div class="timeline-steps">
+                    <div class="timeline-progress" id="timelineProgress" style="width: 0%;"></div>
+                    <div class="timeline-step" data-step="queued">
+                        <div class="step-icon" id="step-queued">📋</div>
+                        <div class="step-label">Queued</div>
+                    </div>
+                    <div class="timeline-step" data-step="running">
+                        <div class="step-icon" id="step-running">🔍</div>
+                        <div class="step-label">Analyzing</div>
+                    </div>
+                    <div class="timeline-step" data-step="generating">
+                        <div class="step-icon" id="step-generating">🎨</div>
+                        <div class="step-label">Dashboard</div>
+                    </div>
+                    <div class="timeline-step" data-step="completed">
+                        <div class="step-icon" id="step-completed">✅</div>
+                        <div class="step-label">Complete</div>
+                    </div>
+                </div>
+                
+                <div class="timeline-details" id="timelineDetails">
+                    <h4>Analysis Status</h4>
+                    <p id="timelineMessage">Waiting for workflow to start...</p>
+                </div>
+            </div>
+            
             <!-- Advanced Options (hidden by default) -->
             <div style="text-align: center; margin-top: 20px;">
                 <a href="#" onclick="showAdvancedOptions(event)" style="color: #667eea; text-decoration: none; font-size: 0.9em;">
@@ -594,7 +724,7 @@
                     showSimpleTriggerModal(repo, result);
                     
                     // Start polling for status
-                    pollAnalysisStatus(result.analysisId);
+                    pollAnalysisStatus(result.analysisId, repo);
                 } else {
                     showError('Failed to queue analysis');
                 }
@@ -673,12 +803,53 @@
             });
         }
         
-        async function pollAnalysisStatus(analysisId) {
+        function updateTimelineStatus(step, message) {
+            const timeline = document.getElementById('analysisTimeline');
+            timeline.style.display = 'block';
+            
+            // Update step icons
+            const steps = ['queued', 'running', 'generating', 'completed'];
+            const currentIndex = steps.indexOf(step);
+            
+            steps.forEach((s, index) => {
+                const icon = document.getElementById(`step-${s}`);
+                if (index < currentIndex) {
+                    icon.classList.remove('active');
+                    icon.classList.add('completed');
+                } else if (index === currentIndex) {
+                    icon.classList.add('active');
+                    icon.classList.remove('completed');
+                } else {
+                    icon.classList.remove('active', 'completed');
+                }
+            });
+            
+            // Update progress bar
+            const progress = document.getElementById('timelineProgress');
+            const progressWidth = (currentIndex / (steps.length - 1)) * 100;
+            progress.style.width = `${progressWidth}%`;
+            
+            // Update message
+            if (message) {
+                document.getElementById('timelineMessage').innerHTML = message;
+            }
+        }
+        
+        async function pollAnalysisStatus(analysisId, repo) {
             let attempts = 0;
             const trigger = new SimpleTrigger();
+            const startTime = Date.now();
+            
+            // Show timeline immediately
+            updateTimelineStatus('queued', 'Analysis queued, waiting for workflow to start...');
             
             const poll = async () => {
                 attempts++;
+                const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                const elapsedMinutes = Math.floor(elapsed / 60);
+                const elapsedSeconds = elapsed % 60;
+                const elapsedStr = elapsedMinutes > 0 ? 
+                    `${elapsedMinutes}m ${elapsedSeconds}s` : `${elapsedSeconds}s`;
                 
                 try {
                     // Use enhanced status checking
@@ -688,16 +859,32 @@
                         const data = statusCheck.data;
                         
                         if (statusCheck.status === 'running') {
-                            // Show running status
-                            showStatus('info', `🔄 Analysis in progress... (${data.message || 'Processing'})`);
+                            // Update timeline for running status
+                            updateTimelineStatus('running', 
+                                `Analyzing <strong>${repo}</strong>...<br>` +
+                                `🕐 Elapsed: ${elapsedStr}<br>` +
+                                (data.workflow_run_url ? 
+                                    `<a href="${data.workflow_run_url}" target="_blank">View Workflow →</a>` : '')
+                            );
                             
-                            // Add workflow link if available
-                            if (data.workflow_run_url) {
-                                const statusEl = document.getElementById('statusMessage');
-                                statusEl.innerHTML += ` <a href="${data.workflow_run_url}" target="_blank">View Workflow →</a>`;
+                            // Check if generating dashboard
+                            if (data.message && data.message.includes('dashboard')) {
+                                updateTimelineStatus('generating', 
+                                    `Generating interactive dashboard...<br>` +
+                                    `🕐 Elapsed: ${elapsedStr}`
+                                );
                             }
+                            
+                            showStatus('info', `🔄 Analysis in progress... (${elapsedStr} elapsed)`);
+                            
                         } else if (statusCheck.status === 'completed') {
                             // Analysis complete!
+                            updateTimelineStatus('completed', 
+                                `✅ Analysis completed in ${elapsedStr}!<br>` +
+                                `📊 Found <strong>${data.issues_found}</strong> issues in <strong>${data.files_analyzed}</strong> files<br>` +
+                                `<a href="${data.dashboard_url}" target="_blank">View Dashboard →</a>`
+                            );
+                            
                             showStatus('success', `✅ Analysis completed! Found ${data.issues_found} issues in ${data.files_analyzed} files`);
                             
                             // Show results preview with real data
@@ -720,9 +907,15 @@
                             });
                             loadHistory();
                             return;
+                            
                         } else if (statusCheck.status === 'failed') {
                             // Analysis failed
                             showStatus('error', `❌ Analysis failed: ${data.message || 'Unknown error'}`);
+                            
+                            updateTimelineStatus('queued', 
+                                `❌ Analysis failed<br>` +
+                                `Error: ${data.message || 'Unknown error'}`
+                            );
                             
                             updateHistoryStatus(analysisId, { 
                                 status: 'failed',
@@ -730,6 +923,14 @@
                             });
                             return;
                         }
+                    } else {
+                        // Still waiting for status file
+                        const message = attempts < 10 ? 
+                            `Waiting for workflow to start... (${elapsedStr})` :
+                            `Workflow starting... (${elapsedStr})<br>` +
+                            `<a href="https://github.com/jerryzhao173985/cppcheck-studio/actions" target="_blank">Check GitHub Actions →</a>`;
+                        
+                        updateTimelineStatus('queued', message);
                     }
                 } catch (e) {
                     console.log('Polling error:', e);
@@ -741,11 +942,15 @@
                     setTimeout(poll, delay);
                 } else {
                     showStatus('info', '⏱️ Analysis is taking longer than expected. <a href="https://github.com/jerryzhao173985/cppcheck-studio/actions" target="_blank">Check GitHub Actions</a>');
+                    updateTimelineStatus('running', 
+                        `⏱️ Taking longer than expected (${elapsedStr})<br>` +
+                        `<a href="https://github.com/jerryzhao173985/cppcheck-studio/actions" target="_blank">Check GitHub Actions →</a>`
+                    );
                 }
             };
             
             // Show initial status
-            showStatus('info', '🚀 Analysis queued! Waiting for workflow to start...');
+            showStatus('info', '🚀 Analysis queued! Monitoring progress...');
             
             // Start polling after a short delay
             setTimeout(poll, 3000);
