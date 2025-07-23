@@ -63,8 +63,8 @@ jobs:
 
     - name: Clone target repository
       run: |
-        echo "🔍 Cloning repository: ${{ env.REPO }}"
-        git clone --depth 1 --branch ${{ env.BRANCH }} https://github.com/${{ env.REPO }}.git target-repo
+        echo "🔍 Cloning repository: ${REPO}"
+        git clone --depth 1 --branch ${BRANCH} https://github.com/${REPO}.git target-repo
         echo "COMMIT_SHA=$(cd target-repo && git rev-parse --short HEAD)" >> $GITHUB_ENV
 
     - name: Analyze repository
@@ -77,7 +77,7 @@ jobs:
           -not -path "*/.git/*" \
           -not -path "*/vendor/*" \
           -not -path "*/third_party/*" \
-          | head -n ${{ env.MAX_FILES }} > cpp_files.txt
+          | head -n ${MAX_FILES} > cpp_files.txt
         
         FILE_COUNT=$(wc -l < cpp_files.txt)
         echo "FILE_COUNT=$FILE_COUNT" >> $GITHUB_ENV
@@ -143,20 +143,7 @@ jobs:
         # Last resort - create minimal dashboard
         if [ ! -f output/dashboard.html ]; then
           echo "⚠️ Creating minimal dashboard"
-          echo '<!DOCTYPE html>
-<html>
-<head>
-    <title>CPPCheck Analysis</title>
-    <style>body { font-family: Arial, sans-serif; margin: 20px; }</style>
-</head>
-<body>
-    <h1>CPPCheck Analysis Results</h1>
-    <p>Repository: ${{ env.REPO }}</p>
-    <p>Files Analyzed: ${{ env.FILE_COUNT }}</p>
-    <p>Issues Found: ${{ env.ISSUE_COUNT }}</p>
-    <p>Check workflow artifacts for detailed results.</p>
-</body>
-</html>' > output/dashboard.html
+          printf '<!DOCTYPE html>\n<html>\n<head>\n<title>CPPCheck Analysis</title>\n</head>\n<body>\n<h1>Analysis Results</h1>\n<p>Dashboard generation failed. Check artifacts.</p>\n</body>\n</html>' > output/dashboard.html
         fi
 
     - name: Generate summary
@@ -196,11 +183,11 @@ jobs:
       run: |
         echo "# 🔍 CPPCheck Analysis Complete" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "**Repository:** ${{ env.REPO }}" >> $GITHUB_STEP_SUMMARY
-        echo "**Branch:** ${{ env.BRANCH }}" >> $GITHUB_STEP_SUMMARY
-        echo "**Commit:** ${{ env.COMMIT_SHA }}" >> $GITHUB_STEP_SUMMARY
-        echo "**Files Analyzed:** ${{ env.FILE_COUNT }}" >> $GITHUB_STEP_SUMMARY
-        echo "**Issues Found:** ${{ env.ISSUE_COUNT }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Repository:** ${REPO}" >> $GITHUB_STEP_SUMMARY
+        echo "**Branch:** ${BRANCH}" >> $GITHUB_STEP_SUMMARY
+        echo "**Commit:** ${COMMIT_SHA}" >> $GITHUB_STEP_SUMMARY
+        echo "**Files Analyzed:** ${FILE_COUNT}" >> $GITHUB_STEP_SUMMARY
+        echo "**Issues Found:** ${ISSUE_COUNT}" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "## Summary" >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
