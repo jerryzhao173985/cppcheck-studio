@@ -115,6 +115,25 @@ class OptimizedDashboardGenerator:
     
     def get_inline_code(self, issue):
         """Get 1-2 lines of code context"""
+        # Check both old and new structure for compatibility
+        code_context = issue.get('code_context', {})
+        if code_context and 'lines' in code_context:
+            lines = code_context['lines']
+            target_line = issue.get('line', 0)
+            
+            # Find the target line in the context
+            for i, line_info in enumerate(lines):
+                if line_info.get('number') == target_line or line_info.get('is_target', False):
+                    # Get the line and maybe one before/after
+                    result = []
+                    if i > 0:
+                        result.append(lines[i-1])
+                    result.append(line_info)
+                    if i < len(lines) - 1 and len(result) < 2:
+                        result.append(lines[i+1])
+                    return result
+        
+        # Fallback to old structure if exists
         context = issue.get('context', {})
         if context and 'code_lines' in context:
             lines = context['code_lines']
@@ -122,7 +141,7 @@ class OptimizedDashboardGenerator:
             
             # Find the target line in the context
             for i, line_info in enumerate(lines):
-                if line_info['line_number'] == target_line:
+                if line_info.get('line_number') == target_line:
                     # Get the line and maybe one before/after
                     result = []
                     if i > 0:
@@ -1104,9 +1123,11 @@ class OptimizedDashboardGenerator:
             if (codeLines.length > 0) {{
                 const codePreview = document.createElement('div');
                 codePreview.className = 'issue-code';
-                codePreview.textContent = codeLines.map(line => 
-                    `${{line.line_number}}: ${{line.content}}`
-                ).join('\\n');
+                codePreview.textContent = codeLines.map(line => {{
+                    // Handle both old format (line_number) and new format (number)
+                    const lineNum = line.number || line.line_number || '?';
+                    return `${{lineNum}}: ${{line.content}}`;
+                }}).join('\\n');
                 content.appendChild(codePreview);
             }}
             
@@ -1195,18 +1216,26 @@ class OptimizedDashboardGenerator:
             `;
             
             // Add code context if available
-            if (issue.context && issue.context.code_lines) {{
+            // Check both new and old structure for code context
+            const hasNewContext = issue.code_context && issue.code_context.lines;
+            const hasOldContext = issue.context && issue.context.code_lines;
+            
+            if (hasNewContext || hasOldContext) {{
                 content += `
                     <div class="detail-section">
                         <h4>Code Context</h4>
                         <div class="code-context">
                 `;
                 
-                issue.context.code_lines.forEach(line => {{
-                    const isHighlighted = line.line_number === issue.line;
+                const lines = hasNewContext ? issue.code_context.lines : issue.context.code_lines;
+                const isNewFormat = hasNewContext;
+                
+                lines.forEach(line => {{
+                    const lineNum = isNewFormat ? line.number : line.line_number;
+                    const isHighlighted = isNewFormat ? (line.is_target || lineNum === issue.line) : (lineNum === issue.line);
                     content += `
                         <div class="code-line ${{isHighlighted ? 'highlighted' : ''}}">
-                            <span class="line-number">${{line.line_number}}</span>
+                            <span class="line-number">${{lineNum}}</span>
                             <span class="line-content">${{escapeHtml(line.content)}}</span>
                         </div>
                     `;
@@ -1387,14 +1416,31 @@ class OptimizedDashboardGenerator:
         }}
         
         function getInlineCode(issue) {{
-            if (!issue.context || !issue.context.code_lines) return [];
+            // Check both new and old structure for compatibility
+            const codeContext = issue.code_context;
+            const oldContext = issue.context;
             
-            const lines = issue.context.code_lines;
+            let lines = null;
+            let isNewFormat = false;
+            
+            if (codeContext && codeContext.lines) {{
+                lines = codeContext.lines;
+                isNewFormat = true;
+            }} else if (oldContext && oldContext.code_lines) {{
+                lines = oldContext.code_lines;
+                isNewFormat = false;
+            }}
+            
+            if (!lines) return [];
+            
             const targetLine = issue.line;
             
             // Find the target line
             for (let i = 0; i < lines.length; i++) {{
-                if (lines[i].line_number === targetLine) {{
+                const lineNum = isNewFormat ? lines[i].number : lines[i].line_number;
+                const isTarget = isNewFormat ? (lines[i].is_target || lineNum === targetLine) : (lineNum === targetLine);
+                
+                if (isTarget) {{
                     const result = [];
                     if (i > 0) result.push(lines[i-1]);
                     result.push(lines[i]);
