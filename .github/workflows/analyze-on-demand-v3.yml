@@ -1,0 +1,208 @@
+name: On-Demand Repository Analysis v3
+
+on:
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: 'GitHub repository to analyze (owner/repo)'
+        required: true
+        type: string
+      branch:
+        description: 'Branch to analyze'
+        required: false
+        type: string
+        default: 'main'
+      max_files:
+        description: 'Maximum files to analyze'
+        required: false
+        type: string
+        default: '500'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+  actions: read
+
+jobs:
+  analyze:
+    name: Analyze C++ Repository
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Setup environment
+      run: |
+        echo "REPO=${{ github.event.inputs.repository }}" >> $GITHUB_ENV
+        echo "BRANCH=${{ github.event.inputs.branch }}" >> $GITHUB_ENV
+        echo "MAX_FILES=${{ github.event.inputs.max_files }}" >> $GITHUB_ENV
+        echo "ANALYSIS_ID=$(date +%s)-$RANDOM" >> $GITHUB_ENV
+        echo "WORKFLOW_RUN_ID=${{ github.run_id }}" >> $GITHUB_ENV
+        echo "WORKFLOW_RUN_URL=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_ENV
+
+    - name: Checkout CPPCheck Studio
+      uses: actions/checkout@v4
+      with:
+        path: cppcheck-studio
+
+    - name: Setup tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cppcheck jq
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Build dashboard generator
+      working-directory: cppcheck-studio/cppcheck-dashboard-generator
+      run: |
+        npm ci
+        npm run build
+        sudo npm link
+
+    - name: Clone target repository
+      run: |
+        echo "🔍 Cloning repository: ${{ env.REPO }}"
+        git clone --depth 1 --branch ${{ env.BRANCH }} https://github.com/${{ env.REPO }}.git target-repo
+        echo "COMMIT_SHA=$(cd target-repo && git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+    - name: Analyze repository
+      run: |
+        cd target-repo
+        
+        # Find C++ files
+        find . -type f \( -name "*.cpp" -o -name "*.cc" -o -name "*.cxx" -o -name "*.c" -o -name "*.h" -o -name "*.hpp" \) \
+          -not -path "*/build/*" \
+          -not -path "*/.git/*" \
+          -not -path "*/vendor/*" \
+          -not -path "*/third_party/*" \
+          | head -n ${{ env.MAX_FILES }} > cpp_files.txt
+        
+        FILE_COUNT=$(wc -l < cpp_files.txt)
+        echo "FILE_COUNT=$FILE_COUNT" >> $GITHUB_ENV
+        
+        if [ $FILE_COUNT -eq 0 ]; then
+          echo "❌ No C++ files found"
+          exit 1
+        fi
+        
+        echo "✅ Found $FILE_COUNT C++ files"
+        
+        # Run cppcheck
+        cppcheck \
+          --enable=all \
+          --inconclusive \
+          --suppress=missingIncludeSystem \
+          --std=c++17 \
+          --xml \
+          --xml-version=2 \
+          --file-list=cpp_files.txt \
+          -j $(nproc) \
+          2> ../cppcheck-results.xml || true
+        
+        cd ..
+        
+        # Convert to JSON
+        python3 cppcheck-studio/xml2json-simple.py cppcheck-results.xml > analysis.json
+        
+        # Get issue count
+        ISSUE_COUNT=$(jq '.issues | length' analysis.json)
+        echo "ISSUE_COUNT=$ISSUE_COUNT" >> $GITHUB_ENV
+        echo "📊 Found $ISSUE_COUNT issues"
+
+    - name: Add code context
+      run: |
+        cd target-repo
+        python3 ../cppcheck-studio/add-code-context.py ../analysis.json ../analysis-with-context.json || {
+          echo "⚠️ Failed to add code context"
+          cp ../analysis.json ../analysis-with-context.json
+        }
+        cd ..
+
+    - name: Generate dashboard
+      run: |
+        mkdir -p output
+        
+        # Try optimized generator first
+        if [ -f cppcheck-studio/generate/generate-optimized-dashboard.py ]; then
+          python3 cppcheck-studio/generate/generate-optimized-dashboard.py \
+            analysis-with-context.json \
+            output/dashboard.html || {
+            echo "⚠️ Optimized generator failed"
+          }
+        fi
+        
+        # Fallback to simple generator
+        if [ ! -f output/dashboard.html ] && [ -f cppcheck-studio/generate/generate-simple-dashboard.py ]; then
+          python3 cppcheck-studio/generate/generate-simple-dashboard.py \
+            analysis-with-context.json \
+            output/dashboard.html
+        fi
+        
+        # Last resort - create minimal dashboard
+        if [ ! -f output/dashboard.html ]; then
+          echo "⚠️ Creating minimal dashboard"
+          echo '<!DOCTYPE html>
+<html>
+<head>
+    <title>CPPCheck Analysis</title>
+    <style>body { font-family: Arial, sans-serif; margin: 20px; }</style>
+</head>
+<body>
+    <h1>CPPCheck Analysis Results</h1>
+    <p>Repository: ${{ env.REPO }}</p>
+    <p>Files Analyzed: ${{ env.FILE_COUNT }}</p>
+    <p>Issues Found: ${{ env.ISSUE_COUNT }}</p>
+    <p>Check workflow artifacts for detailed results.</p>
+</body>
+</html>' > output/dashboard.html
+        fi
+
+    - name: Generate summary
+      run: |
+        python3 cppcheck-studio/scripts/generate-summary.py analysis.json > output/summary.txt || echo "Summary generation failed" > output/summary.txt
+        
+        # Create metadata
+        jq -n \
+          --arg aid "${{ env.ANALYSIS_ID }}" \
+          --arg repo "${{ env.REPO }}" \
+          --arg branch "${{ env.BRANCH }}" \
+          --arg commit "${{ env.COMMIT_SHA }}" \
+          --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+          --argjson fc "${{ env.FILE_COUNT }}" \
+          --argjson ic "${{ env.ISSUE_COUNT }}" \
+          '{
+            analysis_id: $aid,
+            repository: $repo,
+            branch: $branch,
+            commit: $commit,
+            timestamp: $ts,
+            files_analyzed: $fc,
+            issues_found: $ic
+          }' > output/metadata.json
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: analysis-results
+        path: |
+          output/dashboard.html
+          output/summary.txt
+          output/metadata.json
+          analysis.json
+
+    - name: Create job summary
+      run: |
+        echo "# 🔍 CPPCheck Analysis Complete" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Repository:** ${{ env.REPO }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Branch:** ${{ env.BRANCH }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Commit:** ${{ env.COMMIT_SHA }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Files Analyzed:** ${{ env.FILE_COUNT }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Issues Found:** ${{ env.ISSUE_COUNT }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## Summary" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        head -20 output/summary.txt >> $GITHUB_STEP_SUMMARY || echo "No summary available" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY

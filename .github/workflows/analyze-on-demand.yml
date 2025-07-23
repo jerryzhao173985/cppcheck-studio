@@ -91,19 +91,20 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y cppcheck jq
         
-        cd cppcheck-studio/cppcheck-dashboard-generator
-        npm ci
-        npm run build
-        
-        # Force use the local built version
-        sudo npm link --force
+        # Build dashboard generator in subshell to avoid directory navigation issues
+        (
+          cd cppcheck-studio/cppcheck-dashboard-generator
+          npm ci
+          npm run build
+          
+          # Force use the local built version
+          sudo npm link --force
+        )
         
         # Verify the correct version is being used
         echo "Checking dashboard generator version..."
         which cppcheck-dashboard
         cppcheck-dashboard --version || echo "No version info"
-        
-        cd ../..
 
     - name: Setup status tracking
       run: |
@@ -114,6 +115,8 @@ jobs:
         # Set workflow variables for the status function
         export WORKFLOW_RUN_ID="${{ github.run_id }}"
         export WORKFLOW_RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        echo "WORKFLOW_RUN_ID=${{ github.run_id }}" >> $GITHUB_ENV
+        echo "WORKFLOW_RUN_URL=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_ENV
         
         # Create the status function using printf to avoid heredoc issues
         printf '#!/bin/bash\n' > status_updates/update_status.sh
@@ -224,8 +227,8 @@ jobs:
           exit 1
         }
         
-        cd target-repo
-        COMMIT_SHA=$(git rev-parse --short HEAD)
+        # Get commit SHA in subshell
+        COMMIT_SHA=$(cd target-repo && git rev-parse --short HEAD)
         echo "COMMIT_SHA=${COMMIT_SHA}" >> $GITHUB_ENV
         
         # Log repository info
@@ -354,19 +357,21 @@ jobs:
         
         # Add code context
         echo "📝 Adding code context..."
-        cd target-repo
-        REPO_PATH=$(pwd)
+        # Get repository path
+        REPO_PATH=$(cd target-repo && pwd)
+        echo "REPO_PATH=${REPO_PATH}" >> $GITHUB_ENV
         echo "📁 Repository path: $REPO_PATH"
         
         # Show first few files for debugging using inline Python
         echo "📄 Sample files from analysis:"
         python3 -c "import json; exec(\"try:\\n    with open('../analysis.json','r') as f: data=json.load(f)\\n    files=set(issue.get('file','') for issue in data.get('issues',[])[:10])\\n    for f in list(files)[:5]:\\n        if f: print(f'  - {f}')\\nexcept: print('Could not list files')\")" || echo "Could not list files"
         
-        python3 ../cppcheck-studio/add-code-context.py ../analysis.json ../analysis-with-context.json --base-path "$REPO_PATH" || {
-          echo "⚠️ Failed to add code context, using original analysis"
-          cp ../analysis.json ../analysis-with-context.json
-        }
+        # Run from parent directory to maintain consistent paths
         cd ..
+        python3 cppcheck-studio/add-code-context.py analysis.json analysis-with-context.json --base-path "$REPO_PATH" || {
+          echo "⚠️ Failed to add code context, using original analysis"
+          cp analysis.json analysis-with-context.json
+        }
 
     - name: Push status updates to GitHub Pages
       if: github.ref == 'refs/heads/main'
@@ -655,6 +660,8 @@ jobs:
         git add docs/
         git commit -m "Add analysis results for ${REPO} (#${ANALYSIS_ID})" || echo "No changes"
         git push
+        
+        cd ..
 
     - name: Send callback if provided
       if: env.CALLBACK_URL != ''
