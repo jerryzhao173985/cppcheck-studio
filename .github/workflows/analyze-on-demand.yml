@@ -115,8 +115,42 @@ jobs:
         export WORKFLOW_RUN_ID="${{ github.run_id }}"
         export WORKFLOW_RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
         
-        # Use external script to create the status function
-        bash cppcheck-studio/scripts/create-status-function.sh
+        # Create the status function using printf to avoid heredoc issues
+        printf '#!/bin/bash\n' > status_updates/update_status.sh
+        printf 'update_analysis_status() {\n' >> status_updates/update_status.sh
+        printf '    local status=$1\n' >> status_updates/update_status.sh
+        printf '    local message=$2\n' >> status_updates/update_status.sh
+        printf '    local step=$3\n' >> status_updates/update_status.sh
+        printf '    \n' >> status_updates/update_status.sh
+        printf '    # Use absolute path to ensure we write to the correct location\n' >> status_updates/update_status.sh
+        printf '    STATUS_DIR="$GITHUB_WORKSPACE/status_updates"\n' >> status_updates/update_status.sh
+        printf '    mkdir -p "$STATUS_DIR"\n' >> status_updates/update_status.sh
+        printf '    \n' >> status_updates/update_status.sh
+        printf '    # Create status JSON\n' >> status_updates/update_status.sh
+        printf '    cat > "$STATUS_DIR/current_status.json" << EOJSON\n' >> status_updates/update_status.sh
+        printf '{\n' >> status_updates/update_status.sh
+        printf '  "analysis_id": "${ANALYSIS_ID}",\n' >> status_updates/update_status.sh
+        printf '  "repository": "${REPO}",\n' >> status_updates/update_status.sh
+        printf '  "status": "${status}",\n' >> status_updates/update_status.sh
+        printf '  "step": "${step}",\n' >> status_updates/update_status.sh
+        printf '  "workflow_run_id": "${WORKFLOW_RUN_ID}",\n' >> status_updates/update_status.sh
+        printf '  "workflow_run_url": "${WORKFLOW_RUN_URL}",\n' >> status_updates/update_status.sh
+        printf '  "updated_at": "$(date -u +%%Y-%%m-%%dT%%H:%%M:%%SZ)",\n' >> status_updates/update_status.sh
+        printf '  "message": "${message}",\n' >> status_updates/update_status.sh
+        printf '  "progress": {\n' >> status_updates/update_status.sh
+        printf '    "steps_completed": ${STEPS_COMPLETED:-0},\n' >> status_updates/update_status.sh
+        printf '    "total_steps": 5,\n' >> status_updates/update_status.sh
+        printf '    "current_step": "${step}",\n' >> status_updates/update_status.sh
+        printf '    "files_found": ${FILE_COUNT:-0},\n' >> status_updates/update_status.sh
+        printf '    "issues_found": ${ISSUE_COUNT:-0}\n' >> status_updates/update_status.sh
+        printf '  }\n' >> status_updates/update_status.sh
+        printf '}\n' >> status_updates/update_status.sh
+        printf 'EOJSON\n' >> status_updates/update_status.sh
+        printf '    \n' >> status_updates/update_status.sh
+        printf '    echo "📊 Status Update: ${status} - ${message}"\n' >> status_updates/update_status.sh
+        printf '}\n' >> status_updates/update_status.sh
+        
+        chmod +x status_updates/update_status.sh
         
         # Source the created function
         source status_updates/update_status.sh
@@ -347,7 +381,7 @@ jobs:
         
         # Copy latest status if it exists
         if [ -f "$GITHUB_WORKSPACE/status_updates/current_status.json" ]; then
-          cp "$GITHUB_WORKSPACE/status_updates/current_status.json" docs/api/status/${{ env.ANALYSIS_ID }}.json
+          cp "$GITHUB_WORKSPACE/status_updates/current_status.json" docs/api/status/${ANALYSIS_ID}.json
         else
           # Fallback status
           printf '%s\n' \
@@ -542,7 +576,7 @@ jobs:
     - name: Upload results as artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: analysis-${{ env.ANALYSIS_ID }}
+        name: analysis-${{ github.event.inputs.analysis_id || github.event.client_payload.analysis_id || 'generated' }}
         path: |
           output/dashboard-*.html
           output/summary.txt
