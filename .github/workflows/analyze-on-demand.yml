@@ -94,6 +94,7 @@ jobs:
 
     - name: Clone and analyze repository
       run: |
+        set -e  # Exit on any error
         echo "🔍 Analyzing repository: ${{ env.REPO }}"
         
         # Get default branch if not specified
@@ -135,6 +136,7 @@ jobs:
         ls -la | head -10
         
         # Find C++ files
+        echo "🔎 Searching for C++ files..."
         find . -type f \( -name "*.cpp" -o -name "*.cc" -o -name "*.cxx" -o -name "*.c" -o -name "*.h" -o -name "*.hpp" \) \
           -not -path "*/build/*" \
           -not -path "*/.git/*" \
@@ -147,12 +149,17 @@ jobs:
         
         if [ ${FILE_COUNT} -eq 0 ]; then
           echo "❌ No C++ files found in repository"
+          echo "📝 Files searched:"
+          find . -type f | head -20
           exit 1
         fi
         
         echo "✅ Found ${FILE_COUNT} C++ files to analyze"
+        echo "📝 First 10 files:"
+        head -10 cpp_files.txt
         
         # Run cppcheck
+        echo "🔍 Running cppcheck analysis..."
         cppcheck \
           --enable=all \
           --inconclusive \
@@ -162,20 +169,79 @@ jobs:
           --xml-version=2 \
           --file-list=cpp_files.txt \
           -j $(nproc) \
-          2> ../cppcheck-results.xml || true
+          2> ../cppcheck-results.xml || {
+          echo "⚠️ CPPCheck returned non-zero exit code (this is normal if issues were found)"
+        }
         
         cd ..
         
-        # Convert to JSON
-        python3 cppcheck-studio/xml2json-simple.py cppcheck-results.xml > analysis.json
+        # Verify XML output
+        echo "📄 Checking cppcheck XML output..."
+        if [ ! -f cppcheck-results.xml ]; then
+          echo "❌ cppcheck-results.xml not found!"
+          exit 1
+        fi
         
-        # Get issue count
-        ISSUE_COUNT=$(python3 -c "import json; print(len(json.load(open('analysis.json'))['issues']))")
+        XML_SIZE=$(stat -f%z cppcheck-results.xml 2>/dev/null || stat -c%s cppcheck-results.xml)
+        echo "📊 XML file size: ${XML_SIZE} bytes"
+        
+        if [ ${XML_SIZE} -lt 100 ]; then
+          echo "⚠️ Warning: XML file seems too small"
+          echo "📝 XML content:"
+          cat cppcheck-results.xml
+        fi
+        
+        # Convert to JSON
+        echo "🔄 Converting XML to JSON..."
+        python3 cppcheck-studio/xml2json-simple.py cppcheck-results.xml > analysis.json || {
+          echo "❌ Failed to convert XML to JSON"
+          echo "📝 XML content (first 500 chars):"
+          head -c 500 cppcheck-results.xml
+          exit 1
+        }
+        
+        # Verify JSON output
+        if [ ! -f analysis.json ]; then
+          echo "❌ analysis.json not found!"
+          exit 1
+        fi
+        
+        JSON_SIZE=$(stat -f%z analysis.json 2>/dev/null || stat -c%s analysis.json)
+        echo "📊 JSON file size: ${JSON_SIZE} bytes"
+        
+        # Get issue count safely
+        ISSUE_COUNT=$(python3 -c "
+import json
+import sys
+try:
+    with open('analysis.json', 'r') as f:
+        data = json.load(f)
+    issues = data.get('issues', [])
+    print(len(issues))
+except Exception as e:
+    print(f'Error reading analysis.json: {e}', file=sys.stderr)
+    print('0')
+" || echo "0")
+        
         echo "ISSUE_COUNT=${ISSUE_COUNT}" >> $GITHUB_ENV
+        echo "📊 Found ${ISSUE_COUNT} issues"
+        
+        if [ ${ISSUE_COUNT} -eq 0 ]; then
+          echo "⚠️ No issues found. This could mean:"
+          echo "  - The code has no issues (great!)"
+          echo "  - CPPCheck couldn't analyze the files"
+          echo "  - There was an error in processing"
+          echo "📝 First 500 chars of analysis.json:"
+          head -c 500 analysis.json
+        fi
         
         # Add code context
+        echo "📝 Adding code context..."
         cd target-repo
-        python3 ../cppcheck-studio/add-code-context.py ../analysis.json ../analysis-with-context.json
+        python3 ../cppcheck-studio/add-code-context.py ../analysis.json ../analysis-with-context.json || {
+          echo "⚠️ Failed to add code context, using original analysis"
+          cp ../analysis.json ../analysis-with-context.json
+        }
         cd ..
 
     - name: Create status update
@@ -199,59 +265,121 @@ jobs:
         
     - name: Generate dashboard
       run: |
+        set -e  # Exit on error
+        
         # Create output directory
         mkdir -p output
         
         # Debug: Show current directory and files
-        echo "Current directory: $(pwd)"
-        echo "Files in current directory:"
+        echo "📁 Current directory: $(pwd)"
+        echo "📂 Files in current directory:"
         ls -la | head -10
-        echo "Checking analysis file:"
+        
+        # Verify analysis files exist
+        if [ ! -f analysis-with-context.json ]; then
+          echo "❌ analysis-with-context.json not found!"
+          if [ -f analysis.json ]; then
+            echo "⚠️ Using analysis.json instead"
+            cp analysis.json analysis-with-context.json
+          else
+            echo "❌ No analysis files found!"
+            exit 1
+          fi
+        fi
+        
+        echo "📊 Analysis file info:"
         ls -la analysis-with-context.json
-        echo "First few issues:"
+        ANALYSIS_SIZE=$(stat -f%z analysis-with-context.json 2>/dev/null || stat -c%s analysis-with-context.json)
+        echo "📊 Analysis file size: ${ANALYSIS_SIZE} bytes"
+        
+        # Check if analysis has issues
+        echo "📝 First few issues:"
         head -c 1000 analysis-with-context.json
         
         # Generate dashboard
         PROJECT_NAME="${{ env.REPO }}"
+        DASHBOARD_GENERATED=false
         
         # Check which generator to use (prioritize optimized dashboard)
         if [ -f cppcheck-studio/generate/generate-optimized-dashboard.py ]; then
-          echo "Using optimized dashboard generator (developer-focused workflow)..."
+          echo "🎨 Using optimized dashboard generator (developer-focused workflow)..."
           python3 cppcheck-studio/generate/generate-optimized-dashboard.py \
             analysis-with-context.json \
-            output/dashboard-${{ env.ANALYSIS_ID }}.html
-        elif [ -f cppcheck-studio/generate/generate-enhanced-dashboard.py ]; then
-          echo "Using enhanced dashboard generator (beautiful UI with animations)..."
-          python3 cppcheck-studio/generate/generate-enhanced-dashboard.py \
-            analysis-with-context.json \
-            output/dashboard-${{ env.ANALYSIS_ID }}.html
-        elif [ -f cppcheck-studio/generate/generate-simple-dashboard.py ]; then
-          echo "Using simple dashboard generator (no JSONL issues)..."
-          python3 cppcheck-studio/generate/generate-simple-dashboard.py \
-            analysis-with-context.json \
-            output/dashboard-${{ env.ANALYSIS_ID }}.html
-        elif [ -f cppcheck-studio/generate/generate-standalone-virtual-dashboard.py ]; then
-          echo "Using Python dashboard generator for better compatibility..."
-          python3 cppcheck-studio/generate/generate-standalone-virtual-dashboard.py \
-            analysis-with-context.json \
-            output/dashboard-${{ env.ANALYSIS_ID }}.html
-        else
-          echo "Using TypeScript dashboard generator..."
-          cppcheck-dashboard \
-            analysis-with-context.json \
-            output/dashboard-${{ env.ANALYSIS_ID }}.html \
-            --title "${PROJECT_NAME} Analysis" \
-            --project "${PROJECT_NAME} (${{ env.COMMIT_SHA }})" \
-            --verbose
+            output/dashboard-${{ env.ANALYSIS_ID }}.html || {
+            echo "⚠️ Optimized generator failed, trying alternatives..."
+          }
         fi
         
-        # Generate summary
-        python3 cppcheck-studio/scripts/generate-summary.py analysis.json > output/summary.txt
+        # Check if dashboard was generated
+        if [ -f output/dashboard-${{ env.ANALYSIS_ID }}.html ]; then
+          DASHBOARD_GENERATED=true
+          echo "✅ Dashboard generated successfully"
+        elif [ -f cppcheck-studio/generate/generate-simple-dashboard.py ]; then
+          echo "🎨 Trying simple dashboard generator..."
+          python3 cppcheck-studio/generate/generate-simple-dashboard.py \
+            analysis-with-context.json \
+            output/dashboard-${{ env.ANALYSIS_ID }}.html && DASHBOARD_GENERATED=true
+        fi
         
-        # Generate detailed report
-        python3 cppcheck-studio/scripts/generate-detailed-report.py analysis.json > output/report.md
+        # Last resort - create minimal dashboard
+        if [ "$DASHBOARD_GENERATED" = "false" ]; then
+          echo "⚠️ All generators failed, creating minimal dashboard..."
+          cat > output/dashboard-${{ env.ANALYSIS_ID }}.html << 'EOHTML'
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>CPPCheck Analysis - ${{ env.REPO }}</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                .header { background: #f0f0f0; padding: 20px; border-radius: 5px; }
+                .error { color: red; }
+                .info { color: blue; }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>CPPCheck Analysis Results</h1>
+                <p><strong>Repository:</strong> ${{ env.REPO }}</p>
+                <p><strong>Analysis ID:</strong> ${{ env.ANALYSIS_ID }}</p>
+                <p><strong>Files Analyzed:</strong> ${{ env.FILE_COUNT }}</p>
+                <p><strong>Issues Found:</strong> ${{ env.ISSUE_COUNT }}</p>
+            </div>
+            <div class="error">
+                <h2>Dashboard Generation Error</h2>
+                <p>The full interactive dashboard could not be generated. Please check the workflow logs for details.</p>
+                <p>Raw analysis data is available in the workflow artifacts.</p>
+            </div>
+        </body>
+        </html>
+        EOHTML
+        fi
+        
+        # Verify dashboard was created
+        if [ ! -f output/dashboard-${{ env.ANALYSIS_ID }}.html ]; then
+          echo "❌ Failed to create dashboard!"
+          exit 1
+        fi
+        
+        DASHBOARD_SIZE=$(stat -f%z output/dashboard-${{ env.ANALYSIS_ID }}.html 2>/dev/null || stat -c%s output/dashboard-${{ env.ANALYSIS_ID }}.html)
+        echo "📊 Dashboard file size: ${DASHBOARD_SIZE} bytes"
+        
+        # Generate summary (with error handling)
+        echo "📝 Generating summary..."
+        python3 cppcheck-studio/scripts/generate-summary.py analysis.json > output/summary.txt || {
+          echo "⚠️ Summary generation failed"
+          echo "No summary available" > output/summary.txt
+        }
+        
+        # Generate detailed report (with error handling)
+        echo "📝 Generating detailed report..."
+        python3 cppcheck-studio/scripts/generate-detailed-report.py analysis.json > output/report.md || {
+          echo "⚠️ Report generation failed"
+          echo "# Report Generation Failed" > output/report.md
+          echo "Please check the analysis.json file" >> output/report.md
+        }
         
         # Create metadata
+        echo "📝 Creating metadata..."
         cat > output/metadata.json << EOF
         {
           "analysis_id": "${{ env.ANALYSIS_ID }}",
@@ -262,9 +390,13 @@ jobs:
           "files_analyzed": ${{ env.FILE_COUNT }},
           "issues_found": ${{ env.ISSUE_COUNT }},
           "max_files": ${{ env.MAX_FILES_INT }},
-          "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/${{ env.ANALYSIS_ID }}/index.html"
+          "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/${{ env.ANALYSIS_ID }}/index.html",
+          "dashboard_size": ${DASHBOARD_SIZE},
+          "analysis_size": ${ANALYSIS_SIZE}
         }
         EOF
+        
+        echo "✅ Dashboard generation complete!"
 
     - name: Upload results as artifacts
       uses: actions/upload-artifact@v4
