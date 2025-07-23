@@ -247,8 +247,8 @@ jobs:
         echo "📁 Current directory contents:"
         ls -la | head -10
         
-        # Use find with error handling
-        find . -type f \( -name "*.cpp" -o -name "*.cc" -o -name "*.cxx" -o -name "*.c" -o -name "*.h" -o -name "*.hpp" \) \
+        # Use find with error handling - search only in target-repo
+        find target-repo -type f \( -name "*.cpp" -o -name "*.cc" -o -name "*.cxx" -o -name "*.c" -o -name "*.h" -o -name "*.hpp" \) \
           -not -path "*/build/*" \
           -not -path "*/.git/*" \
           -not -path "*/vendor/*" \
@@ -404,6 +404,18 @@ jobs:
         # Show first few files for debugging using inline Python
         echo "📄 Sample files from analysis:"
         python3 -c "import json; exec(\"try:\\n    with open('analysis.json','r') as f: data=json.load(f)\\n    files=set(issue.get('file','') for issue in data.get('issues',[])[:10])\\n    for f in list(files)[:5]:\\n        if f: print(f'  - {f}')\\nexcept: print('Could not list files')\")" || echo "Could not list files"
+        
+        # Debug: Check if target-repo exists and what's in it
+        echo "📂 Checking target-repo structure:"
+        if [ -d "target-repo" ]; then
+          echo "✅ target-repo exists"
+          echo "📁 Contents of target-repo/configurator/src/ (if exists):"
+          ls -la target-repo/configurator/src/ 2>/dev/null | head -10 || echo "Directory not found"
+        else
+          echo "❌ target-repo directory not found!"
+          echo "📁 Current directory contents:"
+          ls -la
+        fi
         
         # Find and run add-code-context.py
         ADD_CONTEXT_SCRIPT=$(find . -name "add-code-context.py" -type f | head -1)
