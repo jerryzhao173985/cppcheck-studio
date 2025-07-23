@@ -598,24 +598,40 @@ jobs:
         
         # Generate summary (with error handling)
         echo "📝 Generating summary..."
-        python3 cppcheck-studio/scripts/generate-summary.py analysis.json > output/summary.txt || {
-          echo "⚠️ Summary generation failed"
+        if [ -f cppcheck-studio/scripts/generate-summary.py ]; then
+          python3 cppcheck-studio/scripts/generate-summary.py analysis.json > output/summary.txt || {
+            echo "⚠️ Summary generation failed"
+            echo "No summary available" > output/summary.txt
+          }
+        else
+          echo "⚠️ generate-summary.py not found"
           echo "No summary available" > output/summary.txt
-        }
+        fi
         
         # Generate detailed report (with error handling)
         echo "📝 Generating detailed report..."
-        python3 cppcheck-studio/scripts/generate-detailed-report.py analysis.json > output/report.md || {
-          echo "⚠️ Report generation failed"
-          echo "# Report Generation Failed" > output/report.md
-          echo "Please check the analysis.json file" >> output/report.md
-        }
+        if [ -f cppcheck-studio/scripts/generate-detailed-report.py ]; then
+          python3 cppcheck-studio/scripts/generate-detailed-report.py analysis.json > output/report.md || {
+            echo "⚠️ Report generation failed"
+            echo "# Report Generation Failed" > output/report.md
+            echo "Please check the analysis.json file" >> output/report.md
+          }
+        else
+          echo "⚠️ generate-detailed-report.py not found"
+          echo "# Report Not Available" > output/report.md
+          echo "Script not found" >> output/report.md
+        fi
         
         # Create metadata with issue breakdown
         echo "📝 Creating metadata with issue breakdown..."
         
         # Get issue breakdown
-        ISSUE_BREAKDOWN=$(python3 cppcheck-studio/scripts/extract-issue-breakdown.py analysis.json || echo '{"total":0,"error":0,"warning":0,"style":0,"performance":0,"portability":0,"information":0}')
+        if [ -f cppcheck-studio/scripts/extract-issue-breakdown.py ]; then
+          ISSUE_BREAKDOWN=$(python3 cppcheck-studio/scripts/extract-issue-breakdown.py analysis.json || echo '{"total":0,"error":0,"warning":0,"style":0,"performance":0,"portability":0,"information":0}')
+        else
+          echo "⚠️ extract-issue-breakdown.py not found, using default breakdown"
+          ISSUE_BREAKDOWN='{"total":0,"error":0,"warning":0,"style":0,"performance":0,"portability":0,"information":0}'
+        fi
         echo "📊 Issue breakdown: $ISSUE_BREAKDOWN"
         
         # Create gallery-compatible metadata
@@ -759,25 +775,37 @@ jobs:
         DASHBOARD_URL="https://jerryzhao173985.github.io/cppcheck-studio/results/${ANALYSIS_ID}/index.html"
         
         # Create job summary using script
-        bash cppcheck-studio/scripts/create-job-summary.sh \
-          "${DASHBOARD_URL}" \
-          "${REPO}" \
-          "${BRANCH}" \
-          "${COMMIT_SHA}" \
-          "${ANALYSIS_ID}" \
-          "${FILE_COUNT:-0}" \
-          "${ISSUE_COUNT:-0}" | \
-        sed -e "s|DASHBOARD_URL_PLACEHOLDER|${DASHBOARD_URL}|g" \
-            -e "s|REPO_PLACEHOLDER|${REPO}|g" \
-            -e "s|BRANCH_PLACEHOLDER|${BRANCH}|g" \
-            -e "s|COMMIT_PLACEHOLDER|${COMMIT_SHA}|g" \
-            -e "s|ANALYSIS_ID_PLACEHOLDER|${ANALYSIS_ID}|g" \
-            -e "s|FILE_COUNT_PLACEHOLDER|${FILE_COUNT:-0}|g" \
-            -e "s|ISSUE_COUNT_PLACEHOLDER|${ISSUE_COUNT:-0}|g" \
-            -e "s|ARTIFACTS_URL_PLACEHOLDER|${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts|g" \
-            -e "s|WORKFLOW_URL_PLACEHOLDER|${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|g" \
-            -e "s|WORKFLOW_RUN_ID|${{ github.run_id }}|g" \
-            -e "s|EVENT_NAME|${{ github.event_name }}|g" \
-            -e "s|RUNNER_OS|${{ runner.os }}|g" \
-            -e "s|COMPLETED_AT|$(date -u +%Y-%m-%dT%H:%M:%SZ)|g" \
-        >> $GITHUB_STEP_SUMMARY
+        if [ -f cppcheck-studio/scripts/create-job-summary.sh ]; then
+          bash cppcheck-studio/scripts/create-job-summary.sh \
+            "${DASHBOARD_URL}" \
+            "${REPO}" \
+            "${BRANCH}" \
+            "${COMMIT_SHA}" \
+            "${ANALYSIS_ID}" \
+            "${FILE_COUNT:-0}" \
+            "${ISSUE_COUNT:-0}" | \
+          sed -e "s|DASHBOARD_URL_PLACEHOLDER|${DASHBOARD_URL}|g" \
+              -e "s|REPO_PLACEHOLDER|${REPO}|g" \
+              -e "s|BRANCH_PLACEHOLDER|${BRANCH}|g" \
+              -e "s|COMMIT_PLACEHOLDER|${COMMIT_SHA}|g" \
+              -e "s|ANALYSIS_ID_PLACEHOLDER|${ANALYSIS_ID}|g" \
+              -e "s|FILE_COUNT_PLACEHOLDER|${FILE_COUNT:-0}|g" \
+              -e "s|ISSUE_COUNT_PLACEHOLDER|${ISSUE_COUNT:-0}|g" \
+              -e "s|ARTIFACTS_URL_PLACEHOLDER|${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts|g" \
+              -e "s|WORKFLOW_URL_PLACEHOLDER|${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|g" \
+              -e "s|WORKFLOW_RUN_ID|${{ github.run_id }}|g" \
+              -e "s|EVENT_NAME|${{ github.event_name }}|g" \
+              -e "s|RUNNER_OS|${{ runner.os }}|g" \
+              -e "s|COMPLETED_AT|$(date -u +%Y-%m-%dT%H:%M:%SZ)|g" \
+          >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⚠️ create-job-summary.sh not found, creating simple summary"
+          echo "# 🔍 CPPCheck Analysis Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Repository:** ${REPO}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${BRANCH}" >> $GITHUB_STEP_SUMMARY
+          echo "**Files Analyzed:** ${FILE_COUNT:-0}" >> $GITHUB_STEP_SUMMARY
+          echo "**Issues Found:** ${ISSUE_COUNT:-0}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "[View Dashboard](${DASHBOARD_URL})" >> $GITHUB_STEP_SUMMARY
+        fi
