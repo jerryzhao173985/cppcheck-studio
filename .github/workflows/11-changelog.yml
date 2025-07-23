@@ -1,0 +1,299 @@
+name: 11 - Changelog Management
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to generate changelog for'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  generate-changelog:
+    name: Generate Changelog
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    
+    - name: Install changelog tools
+      run: |
+        npm install -g conventional-changelog-cli auto-changelog @commitlint/cli @commitlint/config-conventional
+        pip install gitchangelog
+    
+    - name: Generate changelog
+      run: |
+        # Determine version
+        if [ -n "${{ github.event.inputs.version }}" ]; then
+          VERSION="${{ github.event.inputs.version }}"
+        else
+          VERSION=$(node -p "require('./cppcheck-dashboard-generator/package.json').version")
+        fi
+        
+        echo "Generating changelog for version: $VERSION"
+        
+        # Create changelog using conventional-changelog
+        conventional-changelog -p angular -i CHANGELOG.md -s -r 0
+        
+        # Also generate a more detailed changelog
+        cat > .auto-changelog << EOF
+        {
+          "output": "CHANGELOG-DETAILED.md",
+          "template": "keepachangelog",
+          "unreleased": true,
+          "commitLimit": false,
+          "sortCommits": "date",
+          "replaceText": {
+            "^[Ff]eat\\((.*)\\)?: ": "**$1**: ",
+            "^[Ff]ix\\((.*)\\)?: ": "**$1**: ",
+            "^[Dd]ocs\\((.*)\\)?: ": "**$1**: ",
+            "^[Ss]tyle\\((.*)\\)?: ": "**$1**: ",
+            "^[Rr]efactor\\((.*)\\)?: ": "**$1**: ",
+            "^[Pp]erf\\((.*)\\)?: ": "**$1**: ",
+            "^[Tt]est\\((.*)\\)?: ": "**$1**: ",
+            "^[Cc]hore\\((.*)\\)?: ": "**$1**: "
+          }
+        }
+        EOF
+        
+        auto-changelog
+    
+    - name: Generate release notes
+      id: release_notes
+      run: |
+        # Get commits since last tag
+        LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+        
+        if [ -z "$LAST_TAG" ]; then
+          echo "No previous tags found, using all commits"
+          COMMITS=$(git log --pretty=format:"%s|%h|%an" --no-merges)
+        else
+          echo "Generating notes since $LAST_TAG"
+          COMMITS=$(git log --pretty=format:"%s|%h|%an" --no-merges $LAST_TAG..HEAD)
+        fi
+        
+        # Generate release notes
+        cat > RELEASE_NOTES.md << 'EOF'
+        # Release Notes
+        
+        ## 🎯 Highlights
+        EOF
+        
+        # Extract highlights
+        echo "$COMMITS" | grep -E "^feat|BREAKING CHANGE" | head -5 | while IFS='|' read -r msg hash author; do
+          echo "- $msg (${hash}) @${author}" >> RELEASE_NOTES.md
+        done
+        
+        # Group by type
+        cat >> RELEASE_NOTES.md << 'EOF'
+        
+        ## 📦 Changes by Type
+        EOF
+        
+        # Features
+        FEATURES=$(echo "$COMMITS" | grep -E "^feat" | wc -l)
+        if [ "$FEATURES" -gt 0 ]; then
+          echo "" >> RELEASE_NOTES.md
+          echo "### ✨ Features ($FEATURES)" >> RELEASE_NOTES.md
+          echo "$COMMITS" | grep -E "^feat" | while IFS='|' read -r msg hash author; do
+            echo "- $msg (\`$hash\`)" >> RELEASE_NOTES.md
+          done
+        fi
+        
+        # Bug fixes
+        FIXES=$(echo "$COMMITS" | grep -E "^fix" | wc -l)
+        if [ "$FIXES" -gt 0 ]; then
+          echo "" >> RELEASE_NOTES.md
+          echo "### 🐛 Bug Fixes ($FIXES)" >> RELEASE_NOTES.md
+          echo "$COMMITS" | grep -E "^fix" | while IFS='|' read -r msg hash author; do
+            echo "- $msg (\`$hash\`)" >> RELEASE_NOTES.md
+          done
+        fi
+        
+        # Performance
+        PERF=$(echo "$COMMITS" | grep -E "^perf" | wc -l)
+        if [ "$PERF" -gt 0 ]; then
+          echo "" >> RELEASE_NOTES.md
+          echo "### ⚡ Performance ($PERF)" >> RELEASE_NOTES.md
+          echo "$COMMITS" | grep -E "^perf" | while IFS='|' read -r msg hash author; do
+            echo "- $msg (\`$hash\`)" >> RELEASE_NOTES.md
+          done
+        fi
+        
+        # Statistics
+        cat >> RELEASE_NOTES.md << EOF
+        
+        ## 📊 Statistics
+        
+        - Total commits: $(echo "$COMMITS" | wc -l)
+        - Contributors: $(echo "$COMMITS" | cut -d'|' -f3 | sort -u | wc -l)
+        - Features: $FEATURES
+        - Bug fixes: $FIXES
+        - Performance improvements: $PERF
+        EOF
+        
+        # Store for output
+        echo "notes<<EOF" >> $GITHUB_OUTPUT
+        cat RELEASE_NOTES.md >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+    
+    - name: Update changelog files
+      run: |
+        # Create a nice looking changelog
+        cat > CHANGELOG-FORMATTED.md << 'EOF'
+        # Changelog
+        
+        All notable changes to this project will be documented in this file.
+        
+        The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+        and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+        
+        EOF
+        
+        # Append the generated changelog
+        cat CHANGELOG.md >> CHANGELOG-FORMATTED.md
+        mv CHANGELOG-FORMATTED.md CHANGELOG.md
+        
+        # Create PR/commit list
+        echo "## Recent Pull Requests" > RECENT_CHANGES.md
+        gh pr list --state merged --limit 20 --json number,title,author,mergedAt \
+          --jq '.[] | "- PR #\(.number): \(.title) (@\(.author.login)) - \(.mergedAt)"' >> RECENT_CHANGES.md || true
+    
+    - name: Create summary
+      run: |
+        echo "### 📝 Changelog Generation Complete" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Show recent changes
+        echo "#### Recent Changes" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ -f RELEASE_NOTES.md ]; then
+          head -20 RELEASE_NOTES.md >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "#### Files Generated" >> $GITHUB_STEP_SUMMARY
+        echo "- \`CHANGELOG.md\` - Main changelog" >> $GITHUB_STEP_SUMMARY
+        echo "- \`CHANGELOG-DETAILED.md\` - Detailed changelog" >> $GITHUB_STEP_SUMMARY
+        echo "- \`RELEASE_NOTES.md\` - Release notes" >> $GITHUB_STEP_SUMMARY
+        echo "- \`RECENT_CHANGES.md\` - Recent PR list" >> $GITHUB_STEP_SUMMARY
+    
+    - name: Commit changelog updates
+      if: github.ref == 'refs/heads/main'
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        # Check if there are changes
+        if git diff --quiet CHANGELOG.md CHANGELOG-DETAILED.md 2>/dev/null; then
+          echo "No changes to changelog files"
+        else
+          git add CHANGELOG*.md RELEASE_NOTES.md RECENT_CHANGES.md || true
+          git commit -m "docs: update changelog [skip ci]
+
+        Co-authored-by: github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
+          git push
+        fi
+    
+    - name: Upload changelog artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: changelog-files
+        path: |
+          CHANGELOG.md
+          CHANGELOG-DETAILED.md
+          RELEASE_NOTES.md
+          RECENT_CHANGES.md
+        retention-days: 30
+
+  update-release-notes:
+    name: Update Release Notes
+    runs-on: ubuntu-latest
+    needs: generate-changelog
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != ''
+    
+    steps:
+    - name: Download changelog
+      uses: actions/download-artifact@v4
+      with:
+        name: changelog-files
+    
+    - name: Update GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ github.event.inputs.version }}
+        body_path: RELEASE_NOTES.md
+        files: |
+          CHANGELOG.md
+          CHANGELOG-DETAILED.md
+
+  changelog-pr:
+    name: Create Changelog PR
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[changelog]')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Generate comprehensive changelog
+      run: |
+        # Install tools
+        npm install -g conventional-changelog-cli
+        
+        # Generate changelog
+        conventional-changelog -p angular -i CHANGELOG.md -s -r 0
+        
+        # Create PR body
+        cat > pr-body.md << 'EOF'
+        ## 📝 Changelog Update
+        
+        This PR updates the changelog with recent changes.
+        
+        ### Changes included:
+        - Updated CHANGELOG.md with latest commits
+        - Formatted according to conventional changelog standards
+        - Grouped changes by type (feat, fix, perf, etc.)
+        
+        ### Review checklist:
+        - [ ] Changelog entries are accurate
+        - [ ] Breaking changes are clearly marked
+        - [ ] Version numbers are correct
+        - [ ] All significant changes are included
+        
+        ---
+        *This PR was automatically generated*
+        EOF
+    
+    - name: Create Pull Request
+      uses: peter-evans/create-pull-request@v5
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        commit-message: "docs: update changelog"
+        title: "docs: update changelog"
+        body-path: pr-body.md
+        branch: auto-changelog-update
+        delete-branch: true
+        labels: |
+          documentation
+          automated
+        reviewers: |
+          jerryzhao173985

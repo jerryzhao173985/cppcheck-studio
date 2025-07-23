@@ -1,0 +1,385 @@
+name: 10 - Preview Deployments
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+  deployments: write
+  actions: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy-preview:
+    name: Deploy PR Preview
+    runs-on: ubuntu-latest
+    if: github.event.action != 'closed'
+    
+    steps:
+    - name: Checkout PR
+      uses: actions/checkout@v4
+    
+    - name: Setup environment
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: cppcheck-dashboard-generator/package-lock.json
+    
+    - name: Create deployment
+      uses: actions/github-script@v7
+      id: deployment
+      with:
+        script: |
+          const deployment = await github.rest.repos.createDeployment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            ref: context.payload.pull_request.head.sha,
+            environment: `preview-pr-${context.payload.pull_request.number}`,
+            description: 'PR Preview Deployment',
+            auto_merge: false,
+            required_contexts: [],
+            transient_environment: true,
+            production_environment: false
+          });
+          
+          await github.rest.repos.createDeploymentStatus({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            deployment_id: deployment.data.id,
+            state: 'in_progress',
+            environment_url: `https://${context.repo.owner}.github.io/${context.repo.repo}/preview/pr-${context.payload.pull_request.number}/`,
+            description: 'Deploying preview...'
+          });
+          
+          return deployment.data.id;
+    
+    - name: Build preview
+      run: |
+        # Build TypeScript package
+        cd cppcheck-dashboard-generator
+        npm ci
+        npm run build
+        cd ..
+        
+        # Create preview directory
+        mkdir -p preview-build/pr-${{ github.event.pull_request.number }}
+        
+        # Generate example dashboards
+        python3 generate/generate-simple-dashboard.py \
+          data/analysis-with-context.json \
+          preview-build/pr-${{ github.event.pull_request.number }}/index.html
+        
+        # Create preview index
+        cat > preview-build/pr-${{ github.event.pull_request.number }}/preview-info.html << EOF
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>PR #${{ github.event.pull_request.number }} Preview</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 40px; }
+            .container { max-width: 800px; margin: 0 auto; }
+            .header { background: #f6f8fa; padding: 20px; border-radius: 6px; margin-bottom: 20px; }
+            .info { background: #0969da; color: white; padding: 10px 20px; border-radius: 6px; display: inline-block; }
+            .links { margin-top: 20px; }
+            .link-card { background: #f6f8fa; padding: 15px; margin: 10px 0; border-radius: 6px; }
+            a { color: #0969da; text-decoration: none; }
+            a:hover { text-decoration: underline; }
+            .meta { color: #656d76; font-size: 14px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>🚀 PR Preview Deployment</h1>
+              <div class="info">PR #${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }}</div>
+              <div class="meta">
+                <p>Author: @${{ github.event.pull_request.user.login }}</p>
+                <p>Branch: <code>${{ github.event.pull_request.head.ref }}</code></p>
+                <p>Commit: <code>${{ github.event.pull_request.head.sha }}</code></p>
+                <p>Deployed: <time>${new Date().toISOString()}</time></p>
+              </div>
+            </div>
+            
+            <div class="links">
+              <h2>Available Previews</h2>
+              <div class="link-card">
+                <h3>📊 Example Dashboard</h3>
+                <p>Generated from test data</p>
+                <a href="./index.html">View Dashboard →</a>
+              </div>
+              
+              <div class="link-card">
+                <h3>🔗 Quick Links</h3>
+                <ul>
+                  <li><a href="${{ github.event.pull_request.html_url }}">View Pull Request</a></li>
+                  <li><a href="${{ github.event.pull_request.html_url }}/commits">View Commits</a></li>
+                  <li><a href="${{ github.event.pull_request.html_url }}/files">View Changes</a></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </body>
+        </html>
+        EOF
+        
+        # Copy other necessary files
+        cp -r docs/api preview-build/pr-${{ github.event.pull_request.number }}/ || true
+    
+    - name: Deploy to GitHub Pages subdirectory
+      run: |
+        # Configure git
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        # Create orphan branch for previews if it doesn't exist
+        git checkout --orphan gh-pages-preview 2>/dev/null || git checkout gh-pages-preview
+        
+        # Clear old content
+        git rm -rf . 2>/dev/null || true
+        
+        # Create preview structure
+        mkdir -p preview
+        
+        # Copy existing previews (if any)
+        if [ -d "../existing-previews" ]; then
+          cp -r ../existing-previews/* preview/ || true
+        fi
+        
+        # Add new preview
+        cp -r preview-build/pr-${{ github.event.pull_request.number }} preview/
+        
+        # Create index of all previews
+        cat > preview/index.html << 'EOF'
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>CPPCheck Studio - PR Previews</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 40px; }
+            .container { max-width: 1200px; margin: 0 auto; }
+            .preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+            .preview-card { background: #f6f8fa; padding: 20px; border-radius: 6px; border: 1px solid #d1d9e0; }
+            .preview-card h3 { margin-top: 0; }
+            .status { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+            .status-active { background: #1f883d; color: white; }
+            .status-closed { background: #8250df; color: white; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>🚀 CPPCheck Studio PR Previews</h1>
+            <div class="preview-grid" id="previews"></div>
+          </div>
+          <script>
+            // Dynamically list all PR previews
+            fetch('./').then(r => r.text()).then(html => {
+              const parser = new DOMParser();
+              const doc = parser.parseFromString(html, 'text/html');
+              const links = Array.from(doc.querySelectorAll('a[href^="pr-"]'));
+              const grid = document.getElementById('previews');
+              
+              links.forEach(link => {
+                const prNumber = link.href.match(/pr-(\d+)/)?.[1];
+                if (prNumber) {
+                  const card = document.createElement('div');
+                  card.className = 'preview-card';
+                  card.innerHTML = \`
+                    <h3>PR #\${prNumber}</h3>
+                    <span class="status status-active">Active Preview</span>
+                    <p><a href="./pr-\${prNumber}/preview-info.html">View Preview →</a></p>
+                  \`;
+                  grid.appendChild(card);
+                }
+              });
+            });
+          </script>
+        </body>
+        </html>
+        EOF
+        
+        # Commit and push
+        git add -A
+        git commit -m "Deploy preview for PR #${{ github.event.pull_request.number }}"
+        git push -f origin gh-pages-preview
+    
+    - name: Update deployment status
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const deploymentId = ${{ steps.deployment.outputs.result }};
+          const previewUrl = `https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/preview/pr-${{ github.event.pull_request.number }}/preview-info.html`;
+          
+          await github.rest.repos.createDeploymentStatus({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            deployment_id: deploymentId,
+            state: 'success',
+            environment_url: previewUrl,
+            description: 'Preview deployed successfully!'
+          });
+    
+    - name: Comment on PR
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const previewUrl = `https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/preview/pr-${{ github.event.pull_request.number }}/preview-info.html`;
+          const dashboardUrl = `https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/preview/pr-${{ github.event.pull_request.number }}/index.html`;
+          
+          // Find existing comment
+          const comments = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number
+          });
+          
+          const botComment = comments.data.find(comment => 
+            comment.user.type === 'Bot' && comment.body.includes('<!-- preview-deployment -->')
+          );
+          
+          const body = `<!-- preview-deployment -->
+          ## 🚀 Preview Deployment Ready!
+          
+          Your PR preview has been deployed successfully.
+          
+          | 🔗 Preview Links |
+          |------------------|
+          | [📋 Preview Info](${previewUrl}) |
+          | [📊 Example Dashboard](${dashboardUrl}) |
+          
+          ### Preview Details
+          - **Environment**: \`preview-pr-${{ github.event.pull_request.number }}\`
+          - **Commit**: \`${{ github.event.pull_request.head.sha }}\`
+          - **Deployed**: ${new Date().toISOString()}
+          
+          > **Note**: This preview will be automatically removed when the PR is closed.
+          `;
+          
+          if (botComment) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: botComment.id,
+              body
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
+          }
+
+  cleanup-preview:
+    name: Cleanup PR Preview
+    runs-on: ubuntu-latest
+    if: github.event.action == 'closed'
+    
+    steps:
+    - name: Checkout preview branch
+      uses: actions/checkout@v4
+      with:
+        ref: gh-pages-preview
+    
+    - name: Remove preview
+      run: |
+        # Remove the preview directory
+        rm -rf preview/pr-${{ github.event.pull_request.number }}
+        
+        # Commit changes
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add -A
+        git commit -m "Remove preview for closed PR #${{ github.event.pull_request.number }}" || echo "No changes"
+        git push
+    
+    - name: Update deployment status
+      uses: actions/github-script@v7
+      with:
+        script: |
+          // Mark deployment as inactive
+          const deployments = await github.rest.repos.listDeployments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            environment: `preview-pr-${{ github.event.pull_request.number }}`
+          });
+          
+          for (const deployment of deployments.data) {
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: deployment.id,
+              state: 'inactive',
+              description: 'Preview removed (PR closed)'
+            });
+          }
+    
+    - name: Comment on PR
+      uses: actions/github-script@v7
+      with:
+        script: |
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            body: `🧹 Preview deployment has been cleaned up.`
+          });
+
+  lighthouse-preview:
+    name: Lighthouse Analysis
+    runs-on: ubuntu-latest
+    needs: deploy-preview
+    if: github.event.action != 'closed'
+    
+    steps:
+    - name: Wait for deployment
+      run: sleep 30
+    
+    - name: Run Lighthouse
+      uses: treosh/lighthouse-ci-action@v11
+      with:
+        urls: |
+          https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/preview/pr-${{ github.event.pull_request.number }}/index.html
+        uploadArtifacts: true
+        temporaryPublicStorage: true
+    
+    - name: Comment Lighthouse results
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          
+          // Read Lighthouse results
+          const results = JSON.parse(fs.readFileSync('.lighthouseci/lhr-manifest.json', 'utf8'));
+          
+          if (results && results[0]) {
+            const scores = results[0].summary;
+            
+            const getEmoji = (score) => {
+              if (score >= 0.9) return '🟢';
+              if (score >= 0.5) return '🟠';
+              return '🔴';
+            };
+            
+            const body = `### 🏠 Lighthouse Results
+            
+            | Metric | Score |
+            |--------|-------|
+            | ${getEmoji(scores.performance)} Performance | ${Math.round(scores.performance * 100)} |
+            | ${getEmoji(scores.accessibility)} Accessibility | ${Math.round(scores.accessibility * 100)} |
+            | ${getEmoji(scores['best-practices'])} Best Practices | ${Math.round(scores['best-practices'] * 100)} |
+            | ${getEmoji(scores.seo)} SEO | ${Math.round(scores.seo * 100)} |
+            `;
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
+          }

@@ -1,0 +1,223 @@
+name: 03 - Build & Validate
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_call:
+    outputs:
+      typescript-version:
+        description: 'TypeScript package version'
+        value: ${{ jobs.build-typescript.outputs.version }}
+      build-status:
+        description: 'Overall build status'
+        value: ${{ jobs.build-summary.outputs.status }}
+
+jobs:
+  build-typescript:
+    name: Build TypeScript Package
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: cppcheck-dashboard-generator/package-lock.json
+    
+    - name: Cache build outputs
+      uses: actions/cache@v4
+      with:
+        path: |
+          cppcheck-dashboard-generator/dist
+          cppcheck-dashboard-generator/.tsbuildinfo
+        key: ${{ runner.os }}-typescript-build-${{ hashFiles('cppcheck-dashboard-generator/src/**/*.ts', 'cppcheck-dashboard-generator/tsconfig.json') }}
+        restore-keys: |
+          ${{ runner.os }}-typescript-build-
+    
+    - name: Install dependencies
+      run: |
+        cd cppcheck-dashboard-generator
+        npm ci --prefer-offline --no-audit
+    
+    - name: Format check
+      run: |
+        cd cppcheck-dashboard-generator
+        npm run format:check
+    
+    - name: Build package
+      run: |
+        cd cppcheck-dashboard-generator
+        npm run build
+        
+        # Verify build outputs
+        echo "### 📦 Build Outputs" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        find dist -type f -name "*.js" -o -name "*.d.ts" | sort >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+    
+    - name: Extract version
+      id: version
+      run: |
+        cd cppcheck-dashboard-generator
+        VERSION=$(node -p "require('./package.json').version")
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "### 📌 Package Version: \`$VERSION\`" >> $GITHUB_STEP_SUMMARY
+    
+    - name: Pack for testing
+      run: |
+        cd cppcheck-dashboard-generator
+        npm pack
+        mv *.tgz cppcheck-dashboard-generator.tgz
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: typescript-build
+        path: |
+          cppcheck-dashboard-generator/dist/
+          cppcheck-dashboard-generator/cppcheck-dashboard-generator.tgz
+        retention-days: 7
+
+  validate-python:
+    name: Validate Python Scripts
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install black flake8 mypy pylint bandit
+    
+    - name: Format validation
+      run: |
+        black --check generate/ scripts/ || {
+          echo "### ⚠️ Python Format Issues" >> $GITHUB_STEP_SUMMARY
+          echo "Run \`black generate/ scripts/\` to fix formatting" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        }
+    
+    - name: Lint Python code
+      run: |
+        echo "### 🐍 Python Validation" >> $GITHUB_STEP_SUMMARY
+        
+        # Flake8
+        flake8 generate/ scripts/ --max-line-length=100 --statistics --tee --output-file=flake8.txt || true
+        if [ -s flake8.txt ]; then
+          echo "**Flake8 Issues:**" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          cat flake8.txt >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "✅ Flake8: No issues found" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        # Pylint
+        pylint generate/*.py scripts/*.py --exit-zero --score=y > pylint.txt
+        SCORE=$(grep "Your code has been rated at" pylint.txt | sed 's/.*rated at \([0-9.]*\).*/\1/')
+        echo "**Pylint Score:** $SCORE/10" >> $GITHUB_STEP_SUMMARY
+    
+    - name: Security check with Bandit
+      run: |
+        bandit -r generate/ scripts/ -f json -o bandit.json || true
+        
+        if [ -f bandit.json ]; then
+          ISSUES=$(jq '.metrics._totals | to_entries | map(select(.value > 0)) | length' bandit.json)
+          if [ "$ISSUES" -gt 0 ]; then
+            echo "### ⚠️ Security Issues Found" >> $GITHUB_STEP_SUMMARY
+            jq -r '.results[] | "- [\(.severity)] \(.test_name): \(.filename):\(.line_number)"' bandit.json >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ **Bandit:** No security issues found" >> $GITHUB_STEP_SUMMARY
+          fi
+        fi
+
+  validate-workflows:
+    name: Validate GitHub Workflows
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Validate workflow files
+      run: |
+        echo "### 🔧 Workflow Validation" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Check for workflow errors
+        for workflow in .github/workflows/*.yml; do
+          if [ -f "$workflow" ]; then
+            echo -n "Validating $(basename $workflow)... "
+            if yq eval '.' "$workflow" > /dev/null 2>&1; then
+              echo "✅"
+              echo "✅ \`$(basename $workflow)\`" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "❌"
+              echo "❌ \`$(basename $workflow)\` - Invalid YAML" >> $GITHUB_STEP_SUMMARY
+              exit 1
+            fi
+          fi
+        done
+    
+    - name: Check for workflow best practices
+      run: |
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Best Practices Check:**" >> $GITHUB_STEP_SUMMARY
+        
+        # Check for concurrency control
+        WORKFLOWS_WITH_CONCURRENCY=$(grep -l "concurrency:" .github/workflows/*.yml | wc -l)
+        TOTAL_WORKFLOWS=$(ls .github/workflows/*.yml | wc -l)
+        echo "- Concurrency control: $WORKFLOWS_WITH_CONCURRENCY/$TOTAL_WORKFLOWS workflows" >> $GITHUB_STEP_SUMMARY
+        
+        # Check for timeout-minutes
+        WORKFLOWS_WITH_TIMEOUT=$(grep -l "timeout-minutes:" .github/workflows/*.yml | wc -l)
+        echo "- Timeout settings: $WORKFLOWS_WITH_TIMEOUT/$TOTAL_WORKFLOWS workflows" >> $GITHUB_STEP_SUMMARY
+        
+        # Check for caching
+        WORKFLOWS_WITH_CACHE=$(grep -l "actions/cache" .github/workflows/*.yml | wc -l)
+        echo "- Caching used: $WORKFLOWS_WITH_CACHE/$TOTAL_WORKFLOWS workflows" >> $GITHUB_STEP_SUMMARY
+
+  build-summary:
+    name: Build Summary
+    runs-on: ubuntu-latest
+    needs: [build-typescript, validate-python, validate-workflows]
+    if: always()
+    outputs:
+      status: ${{ steps.status.outputs.status }}
+    
+    steps:
+    - name: Determine build status
+      id: status
+      run: |
+        if [ "${{ needs.build-typescript.result }}" == "success" ] && \
+           [ "${{ needs.validate-python.result }}" == "success" ] && \
+           [ "${{ needs.validate-workflows.result }}" == "success" ]; then
+          echo "status=success" >> $GITHUB_OUTPUT
+          echo "### ✅ Build Successful!" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "status=failure" >> $GITHUB_OUTPUT
+          echo "### ❌ Build Failed!" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Component | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| TypeScript Build | ${{ needs.build-typescript.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Python Validation | ${{ needs.validate-python.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Workflow Validation | ${{ needs.validate-workflows.result }} |" >> $GITHUB_STEP_SUMMARY

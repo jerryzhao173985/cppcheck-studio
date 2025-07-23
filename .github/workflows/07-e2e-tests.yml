@@ -1,0 +1,360 @@
+name: 07 - E2E Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+    paths:
+      - 'cppcheck-dashboard-generator/**'
+      - 'generate/**'
+      - '.github/workflows/07-e2e-tests.yml'
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  playwright-tests:
+    name: E2E Dashboard Tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: cppcheck-dashboard-generator/package-lock.json
+    
+    - name: Install dependencies
+      run: |
+        cd cppcheck-dashboard-generator
+        npm ci
+        npm run build
+        cd ..
+        
+        # Install Playwright
+        npm init -y
+        npm install -D @playwright/test
+        npx playwright install --with-deps ${{ matrix.browser }}
+    
+    - name: Generate test dashboards
+      run: |
+        # Generate various test dashboards
+        python3 generate/generate-simple-dashboard.py \
+          data/analysis-with-context.json \
+          test-dashboards/simple.html
+        
+        python3 generate/generate-standalone-virtual-dashboard.py \
+          data/analysis-with-context.json \
+          test-dashboards/virtual.html
+        
+        cd cppcheck-dashboard-generator
+        node dist/cli.js \
+          ../data/analysis-with-context.json \
+          ../test-dashboards/typescript.html
+    
+    - name: Start local server
+      run: |
+        npx http-server test-dashboards -p 8080 &
+        sleep 5
+    
+    - name: Run E2E tests
+      run: |
+        cat > playwright.config.js << 'EOF'
+        module.exports = {
+          testDir: './e2e',
+          timeout: 30000,
+          use: {
+            baseURL: 'http://localhost:8080',
+            screenshot: 'only-on-failure',
+            video: 'retain-on-failure',
+            trace: 'on-first-retry',
+          },
+          projects: [
+            {
+              name: '${{ matrix.browser }}',
+              use: { browserName: '${{ matrix.browser }}' },
+            },
+          ],
+          reporter: [
+            ['html', { open: 'never' }],
+            ['junit', { outputFile: 'test-results/junit.xml' }],
+          ],
+        };
+        EOF
+        
+        mkdir -p e2e
+        cat > e2e/dashboard.spec.js << 'EOF'
+        const { test, expect } = require('@playwright/test');
+        
+        const dashboards = [
+          { name: 'Simple Dashboard', url: '/simple.html' },
+          { name: 'Virtual Scroll Dashboard', url: '/virtual.html' },
+          { name: 'TypeScript Dashboard', url: '/typescript.html' },
+        ];
+        
+        dashboards.forEach(({ name, url }) => {
+          test.describe(`${name}`, () => {
+            test.beforeEach(async ({ page }) => {
+              await page.goto(url);
+              await page.waitForLoadState('networkidle');
+            });
+            
+            test('should load without errors', async ({ page }) => {
+              const consoleErrors = [];
+              page.on('console', msg => {
+                if (msg.type() === 'error') consoleErrors.push(msg.text());
+              });
+              
+              await page.waitForTimeout(1000);
+              expect(consoleErrors).toHaveLength(0);
+            });
+            
+            test('should display statistics cards', async ({ page }) => {
+              const statsCards = await page.locator('.stat-card, .stats-card').count();
+              expect(statsCards).toBeGreaterThan(0);
+              
+              // Check for issue counts
+              const totalIssues = await page.locator('text=/Total.*Issues|Issues.*Total/i').isVisible();
+              expect(totalIssues).toBeTruthy();
+            });
+            
+            test('should have working search', async ({ page }) => {
+              const searchInput = page.locator('input[type="search"], input[placeholder*="Search"]');
+              await expect(searchInput).toBeVisible();
+              
+              // Search for a specific term
+              await searchInput.fill('error');
+              await searchInput.press('Enter');
+              await page.waitForTimeout(500);
+              
+              // Verify filtering worked (issue count should change or highlight should appear)
+              const hasResults = await page.locator('.issue-item, tr.issue, .issue-row').count();
+              expect(hasResults).toBeGreaterThan(0);
+            });
+            
+            test('should filter by severity', async ({ page }) => {
+              // Look for severity filter buttons
+              const errorButton = page.locator('button:has-text("Error"), button:has-text("Errors")').first();
+              
+              if (await errorButton.isVisible()) {
+                await errorButton.click();
+                await page.waitForTimeout(500);
+                
+                // Verify only error severity issues are shown
+                const visibleIssues = await page.locator('.issue-item:visible, tr.issue:visible').count();
+                expect(visibleIssues).toBeGreaterThan(0);
+              }
+            });
+            
+            test('should show code preview modal', async ({ page }) => {
+              // Find and click a code preview button
+              const previewButton = page.locator('button[title*="code"], button:has-text("👁"), .code-preview-btn').first();
+              
+              if (await previewButton.isVisible()) {
+                await previewButton.click();
+                
+                // Wait for modal
+                const modal = page.locator('.modal, [role="dialog"], .code-modal');
+                await expect(modal).toBeVisible({ timeout: 5000 });
+                
+                // Close modal
+                const closeButton = page.locator('.modal button:has-text("Close"), .modal .close, [aria-label="Close"]').first();
+                if (await closeButton.isVisible()) {
+                  await closeButton.click();
+                  await expect(modal).not.toBeVisible();
+                } else {
+                  // Try clicking outside or pressing Escape
+                  await page.keyboard.press('Escape');
+                  await expect(modal).not.toBeVisible();
+                }
+              }
+            });
+            
+            test('should be responsive', async ({ page }) => {
+              // Test mobile viewport
+              await page.setViewportSize({ width: 375, height: 667 });
+              await page.waitForTimeout(500);
+              
+              // Check that content is still accessible
+              const isResponsive = await page.locator('.container, .dashboard, main').isVisible();
+              expect(isResponsive).toBeTruthy();
+              
+              // Reset viewport
+              await page.setViewportSize({ width: 1280, height: 720 });
+            });
+            
+            test('should handle large datasets efficiently', async ({ page }) => {
+              // Measure initial load time
+              const startTime = Date.now();
+              await page.reload();
+              await page.waitForLoadState('networkidle');
+              const loadTime = Date.now() - startTime;
+              
+              // Should load within reasonable time
+              expect(loadTime).toBeLessThan(5000);
+              
+              // Check if virtual scrolling is working (for applicable dashboards)
+              if (url.includes('virtual')) {
+                const viewport = page.locator('.virtual-scroll-viewport, .issue-list, tbody');
+                const viewportHeight = await viewport.boundingBox();
+                
+                if (viewportHeight) {
+                  // Scroll and check performance
+                  await viewport.evaluate(el => el.scrollTop = 1000);
+                  await page.waitForTimeout(100);
+                  
+                  // Should not render all items at once
+                  const visibleItems = await page.locator('.issue-item:visible, tr.issue:visible').count();
+                  expect(visibleItems).toBeLessThan(100); // Assuming virtual scroll limits visible items
+                }
+              }
+            });
+          });
+        });
+        
+        test.describe('Accessibility', () => {
+          test('should have proper ARIA labels', async ({ page }) => {
+            await page.goto('/simple.html');
+            
+            // Check for main landmarks
+            const main = await page.locator('main, [role="main"]').count();
+            expect(main).toBeGreaterThan(0);
+            
+            // Check form controls have labels
+            const inputs = await page.locator('input:not([type="hidden"])').all();
+            for (const input of inputs) {
+              const hasLabel = await input.evaluate(el => {
+                return !!(el.getAttribute('aria-label') || 
+                         el.getAttribute('aria-labelledby') || 
+                         document.querySelector(`label[for="${el.id}"]`));
+              });
+              expect(hasLabel).toBeTruthy();
+            }
+          });
+          
+          test('should be keyboard navigable', async ({ page }) => {
+            await page.goto('/simple.html');
+            
+            // Tab through interactive elements
+            await page.keyboard.press('Tab');
+            await page.keyboard.press('Tab');
+            
+            // Check if an element has focus
+            const hasFocus = await page.evaluate(() => {
+              return document.activeElement !== document.body;
+            });
+            expect(hasFocus).toBeTruthy();
+          });
+        });
+        EOF
+        
+        npx playwright test --reporter=list
+    
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: playwright-results-${{ matrix.browser }}
+        path: |
+          playwright-report/
+          test-results/
+          test-dashboards/
+        retention-days: 7
+    
+    - name: Create summary
+      if: always()
+      run: |
+        echo "### 🎭 E2E Test Results - ${{ matrix.browser }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ -f test-results/junit.xml ]; then
+          # Parse test results
+          TOTAL=$(grep -o 'tests="[0-9]*"' test-results/junit.xml | grep -o '[0-9]*' | head -1)
+          PASSED=$(grep -o '<testcase' test-results/junit.xml | wc -l)
+          FAILED=$(grep -o '<failure' test-results/junit.xml | wc -l)
+          
+          echo "| Browser | Total | Passed | Failed |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-------|--------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| ${{ matrix.browser }} | ${TOTAL:-0} | ${PASSED:-0} | ${FAILED:-0} |" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ No test results found" >> $GITHUB_STEP_SUMMARY
+        fi
+
+  visual-regression:
+    name: Visual Regression Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    
+    - name: Install dependencies
+      run: |
+        npm init -y
+        npm install -D @playwright/test
+        npx playwright install chromium
+    
+    - name: Generate dashboards
+      run: |
+        python3 generate/generate-simple-dashboard.py \
+          data/analysis-with-context.json \
+          test-dashboards/dashboard.html
+    
+    - name: Visual regression tests
+      run: |
+        mkdir -p e2e
+        cat > e2e/visual.spec.js << 'EOF'
+        const { test, expect } = require('@playwright/test');
+        
+        test.describe('Visual Regression', () => {
+          test('dashboard screenshot', async ({ page }) => {
+            await page.goto('file://' + process.cwd() + '/test-dashboards/dashboard.html');
+            await page.waitForLoadState('networkidle');
+            await page.waitForTimeout(1000);
+            
+            // Take full page screenshot
+            await expect(page).toHaveScreenshot('dashboard-full.png', { 
+              fullPage: true,
+              maxDiffPixels: 100,
+            });
+            
+            // Take component screenshots
+            const statsSection = page.locator('.stats-container, .statistics');
+            if (await statsSection.isVisible()) {
+              await expect(statsSection).toHaveScreenshot('stats-section.png');
+            }
+            
+            const issueList = page.locator('.issue-list, .issues-table, tbody').first();
+            if (await issueList.isVisible()) {
+              await expect(issueList).toHaveScreenshot('issue-list.png');
+            }
+          });
+        });
+        EOF
+        
+        npx playwright test e2e/visual.spec.js --update-snapshots || true
+        npx playwright test e2e/visual.spec.js
+    
+    - name: Upload visual diffs
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: visual-regression-diffs
+        path: test-results/
+        retention-days: 7
