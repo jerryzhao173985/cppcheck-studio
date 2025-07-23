@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 """
-Standalone Virtual Scroll Dashboard Generator
+Standalone Virtual Scroll Dashboard Generator - RECOMMENDED VERSION
+This is the feature-complete dashboard with all intended functionality:
+- Virtual scrolling for unlimited issues
+- Full code context preview with modal popups
+- Advanced filtering and search
+- Optimized performance
+- Beautiful, modern UI
 Embeds JSONL data as JavaScript to avoid CORS issues
 """
 

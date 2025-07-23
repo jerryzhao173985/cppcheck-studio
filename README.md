@@ -2,9 +2,18 @@
 
 Transform CPPCheck static analysis results into beautiful, interactive HTML dashboards.
 
+## 🎯 Recommended: Virtual Scroll Dashboard
+
+The **Virtual Scroll Dashboard** is the feature-complete implementation with all intended functionality:
+- Handles unlimited issues with smooth virtual scrolling
+- Full code context preview with modal popups
+- Advanced filtering and search capabilities
+- Optimized performance for large codebases
+- Beautiful, modern UI with all interactive features
+
 ## Features
 
-- **Virtual Scrolling** - Handle 100,000+ issues smoothly
+- **Virtual Scrolling** - Handle 100,000+ issues smoothly (default)
 - **Interactive Filtering** - Real-time search and severity filters
 - **Code Context** - Preview issues with surrounding code
 - **Standalone HTML** - No server required, works offline
@@ -30,10 +39,10 @@ This will guide you through analyzing your code and generating your first dashbo
 # Show available commands
 python3 cppcheck-studio.py --help
 
-# Analyze and generate dashboard
+# Analyze and generate dashboard (uses recommended virtual scroll by default)
 python3 cppcheck-studio.py analyze analysis.json
 
-# Add code context first
+# Add code context first for better results
 python3 cppcheck-studio.py add-context analysis.json
 python3 cppcheck-studio.py analyze analysis-with-context.json
 
@@ -82,9 +91,8 @@ cppcheck --enable=all --std=c++17 --suppress=missingInclude \
 
 The unified CLI (`cppcheck-studio.py`) provides these commands:
 
-- **analyze** - Generate dashboard from analysis JSON
-  - `--virtual` - Use virtual scrolling for large datasets
-  - `--minimal` - Generate minimal dashboard without code
+- **analyze** - Generate dashboard from analysis JSON (uses virtual scroll by default)
+  - `--minimal` - Generate minimal dashboard without code (not recommended)
   - `--force` - Overwrite existing output
   
 - **add-context** - Add code context to analysis
@@ -96,9 +104,9 @@ The unified CLI (`cppcheck-studio.py`) provides these commands:
 ## Available Generators
 
 ### Python Scripts
-- `generate-standalone-virtual-dashboard.py` - Best for large datasets (virtual scrolling)
-- `generate-ultimate-dashboard.py` - Feature-rich for <5000 issues
-- `generate-production-dashboard.py` - Minimal size, no code context
+- `generate-standalone-virtual-dashboard.py` - **RECOMMENDED** - Feature-complete dashboard with virtual scrolling
+- `generate-ultimate-dashboard.py` - Legacy dashboard (limited features, not recommended)
+- `generate-production-dashboard.py` - Minimal dashboard without code context (not recommended)
 
 ### TypeScript Package
 - Full CLI with options (`--title`, `--project`, etc.)

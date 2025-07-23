@@ -119,9 +119,8 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s analyze analysis.json                    # Generate dashboard with auto-selected generator
+  %(prog)s analyze analysis.json                    # Generate dashboard (uses recommended virtual scroll)
   %(prog)s analyze analysis.json -o report.html    # Specify output file
-  %(prog)s analyze analysis.json --virtual          # Force virtual scrolling for large datasets
   %(prog)s analyze analysis.json --minimal          # Generate minimal dashboard without code
   
   %(prog)s add-context analysis.json               # Add code context to analysis file
@@ -140,8 +139,7 @@ For more information, visit: https://github.com/yourusername/cppcheck-studio
     analyze_parser = subparsers.add_parser('analyze', help='Generate dashboard from analysis JSON')
     analyze_parser.add_argument('input', help='CPPCheck JSON analysis file')
     analyze_parser.add_argument('-o', '--output', help='Output HTML file (default: dashboard.html)')
-    analyze_parser.add_argument('--virtual', action='store_true', help='Use virtual scrolling (best for 5000+ issues)')
-    analyze_parser.add_argument('--minimal', action='store_true', help='Generate minimal dashboard without code context')
+    analyze_parser.add_argument('--minimal', action='store_true', help='Generate minimal dashboard without code context (not recommended)')
     analyze_parser.add_argument('--force', action='store_true', help='Overwrite existing output file')
     
     # Add context command
@@ -222,15 +220,14 @@ For more information, visit: https://github.com/yourusername/cppcheck-studio
             return 1
             
         # Select appropriate generator
+        # Virtual scroll dashboard is the recommended default - it has the most features
         if args.minimal:
             generator = 'generate/generate-production-dashboard.py'
             generator_name = 'Minimal Dashboard'
-        elif args.virtual or stats['total'] > 5000:
-            generator = 'generate/generate-standalone-virtual-dashboard.py'
-            generator_name = 'Virtual Scroll Dashboard'
         else:
-            generator = 'generate/generate-ultimate-dashboard.py'
-            generator_name = 'Ultimate Dashboard'
+            # Always use virtual scroll by default - it's the best implementation
+            generator = 'generate/generate-standalone-virtual-dashboard.py'
+            generator_name = 'Virtual Scroll Dashboard (Recommended)'
             
         print_color(f"\n📈 Generating {generator_name}", Colors.BOLD)
         print_color(f"  Input:  {args.input} ({stats['total']} issues)", Colors.BLUE)
