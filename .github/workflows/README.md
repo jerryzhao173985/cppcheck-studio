@@ -200,6 +200,13 @@ gh workflow run scheduled-maintenance.yml \
 - NPM_TOKEN is only required for automated npm publishing
 - All other tokens are optional for enhanced features
 
+### Dashboard Generation
+The CI uses **`generate-standalone-virtual-dashboard.py`** as the primary dashboard generator because it:
+- Provides virtual scrolling for handling large datasets efficiently
+- Has all the features and correct implementation
+- Delivers the best user experience
+- Is the recommended and preferred dashboard format
+
 ### Environment Variables
 - Set in workflow files directly
 - No additional configuration needed

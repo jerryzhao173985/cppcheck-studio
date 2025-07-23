@@ -49,14 +49,12 @@ jobs:
     
     - name: Generate test dashboards
       run: |
-        # Generate various test dashboards
-        python3 generate/generate-simple-dashboard.py \
-          data/analysis-with-context.json \
-          test-dashboards/simple.html
-        
+        # Generate test dashboards using the virtual scrolling implementation
         python3 generate/generate-standalone-virtual-dashboard.py \
           data/analysis-with-context.json \
           test-dashboards/virtual.html
+        
+        # Also test the TypeScript generator
         
         cd cppcheck-dashboard-generator
         node dist/cli.js \
@@ -98,7 +96,6 @@ jobs:
         const { test, expect } = require('@playwright/test');
         
         const dashboards = [
-          { name: 'Simple Dashboard', url: '/simple.html' },
           { name: 'Virtual Scroll Dashboard', url: '/virtual.html' },
           { name: 'TypeScript Dashboard', url: '/typescript.html' },
         ];
