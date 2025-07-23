@@ -48,7 +48,11 @@ jobs:
           echo "BRANCH=${{ github.event.client_payload.branch || 'main' }}" >> $GITHUB_ENV
           echo "MAX_FILES=${{ github.event.client_payload.max_files || 500 }}" >> $GITHUB_ENV
           echo "CALLBACK_URL=${{ github.event.client_payload.callback_url }}" >> $GITHUB_ENV
-          echo "ANALYSIS_ID=${{ github.event.client_payload.analysis_id || '$(date +%s)-$(echo $RANDOM)' }}" >> $GITHUB_ENV
+          if [ -n "${{ github.event.client_payload.analysis_id }}" ]; then
+            echo "ANALYSIS_ID=${{ github.event.client_payload.analysis_id }}" >> $GITHUB_ENV
+          else
+            echo "ANALYSIS_ID=$(date +%s)-$(echo $RANDOM)" >> $GITHUB_ENV
+          fi
         else
           echo "REPO=${{ github.event.inputs.repository }}" >> $GITHUB_ENV
           echo "BRANCH=${{ github.event.inputs.branch }}" >> $GITHUB_ENV
