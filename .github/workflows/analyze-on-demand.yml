@@ -138,18 +138,28 @@ EOJSON
 EOF
         
         chmod +x status_updates/update_status.sh
-        source status_updates/update_status.sh
+        source $GITHUB_WORKSPACE/status_updates/update_status.sh
         
         # Initial status with default values
-        STEPS_COMPLETED=0
-        FILE_COUNT=0
-        ISSUE_COUNT=0
+        export STEPS_COMPLETED=0
+        export FILE_COUNT=0
+        export ISSUE_COUNT=0
+        export ANALYSIS_ID="${{ env.ANALYSIS_ID }}"
+        export REPO="${{ env.REPO }}"
         update_analysis_status "queued" "Analysis request received" "initializing"
     
     - name: Clone and analyze repository
       run: |
         set -e  # Exit on any error
-        source status_updates/update_status.sh
+        # Source the update script using absolute path
+        source $GITHUB_WORKSPACE/status_updates/update_status.sh
+        
+        # Re-export variables for this step
+        export ANALYSIS_ID="${{ env.ANALYSIS_ID }}"
+        export REPO="${{ env.REPO }}"
+        export STEPS_COMPLETED=${STEPS_COMPLETED:-0}
+        export FILE_COUNT=${FILE_COUNT:-0}
+        export ISSUE_COUNT=${ISSUE_COUNT:-0}
         
         # Check if repository is provided
         if [ -z "${{ env.REPO }}" ]; then
@@ -209,7 +219,7 @@ EOF
         ls -la | head -10
         
         # Update status after successful clone
-        STEPS_COMPLETED=1
+        export STEPS_COMPLETED=1
         update_analysis_status "running" "Repository cloned successfully, searching for C++ files..." "searching"
         
         # Find C++ files
@@ -227,6 +237,7 @@ EOF
         
         FILE_COUNT=$(wc -l < cpp_files.txt | tr -d ' ')
         echo "FILE_COUNT=${FILE_COUNT}" >> $GITHUB_ENV
+        export FILE_COUNT
         
         if [ ${FILE_COUNT} -eq 0 ]; then
           echo "❌ No C++ files found in repository"
@@ -240,7 +251,7 @@ EOF
           echo "ℹ️ Excluded paths: */build/*, */.git/*, */vendor/*, */third_party/*"
           
           # Update status before exiting
-          STEPS_COMPLETED=2
+          export STEPS_COMPLETED=2
           update_analysis_status "failed" "No C++ files found in repository" "failed"
           exit 1
         fi
@@ -250,7 +261,7 @@ EOF
         head -10 cpp_files.txt
         
         # Update status after finding files
-        STEPS_COMPLETED=2
+        export STEPS_COMPLETED=2
         update_analysis_status "running" "Found ${FILE_COUNT} C++ files, starting static analysis..." "analyzing"
         
         # Run cppcheck
@@ -305,16 +316,10 @@ EOF
         echo "📊 JSON file size: ${JSON_SIZE} bytes"
         
         # Get issue count safely
-        ISSUE_COUNT=$(python3 -c "
-import json
-try:
-    data = json.load(open('analysis.json'))
-    print(len(data.get('issues', [])))
-except:
-    print('0')
-" || echo "0")
+        ISSUE_COUNT=$(python3 -c "import json; data = {'issues': []}; exec(\"\"\"try:\n    with open('analysis.json', 'r') as f:\n        data = json.load(f)\nexcept Exception as e:\n    pass\"\"\"); print(len(data.get('issues', [])))" || echo "0")
         
         echo "ISSUE_COUNT=${ISSUE_COUNT}" >> $GITHUB_ENV
+        export ISSUE_COUNT
         echo "📊 Found ${ISSUE_COUNT} issues"
         
         if [ ${ISSUE_COUNT} -eq 0 ]; then
@@ -327,7 +332,7 @@ except:
         fi
         
         # Update status after analysis
-        STEPS_COMPLETED=3
+        export STEPS_COMPLETED=3
         update_analysis_status "running" "Analysis complete: found ${ISSUE_COUNT} issues in ${FILE_COUNT} files" "processing"
         
         # Add code context
@@ -338,17 +343,7 @@ except:
         
         # Show first few files for debugging
         echo "📄 Sample files from analysis:"
-        python3 -c "
-import json
-try:
-    data = json.load(open('../analysis.json'))
-    files = set(issue.get('file', '') for issue in data.get('issues', [])[:10])
-    for f in list(files)[:5]:
-        if f:
-            print(f'  - {f}')
-except:
-    print('Could not list files')
-" || echo "Could not list files"
+        python3 -c "import json; exec(\"\"\"try:\n    with open('../analysis.json', 'r') as f:\n        data = json.load(f)\n    files = set(issue.get('file', '') for issue in data.get('issues', [])[:10])\n    for f in list(files)[:5]:\n        if f: print(f'  - {f}')\nexcept Exception:\n    print('Could not list files')\"\"\");" || echo "Could not list files"
         
         python3 ../cppcheck-studio/add-code-context.py ../analysis.json ../analysis-with-context.json --base-path "$REPO_PATH" || {
           echo "⚠️ Failed to add code context, using original analysis"
@@ -401,10 +396,17 @@ except:
     - name: Generate dashboard
       run: |
         set -e  # Exit on error
-        source status_updates/update_status.sh
+        source $GITHUB_WORKSPACE/status_updates/update_status.sh
+        
+        # Re-export variables for this step
+        export ANALYSIS_ID="${{ env.ANALYSIS_ID }}"
+        export REPO="${{ env.REPO }}"
+        export STEPS_COMPLETED=${STEPS_COMPLETED:-4}
+        export FILE_COUNT="${{ env.FILE_COUNT }}"
+        export ISSUE_COUNT="${{ env.ISSUE_COUNT }}"
         
         # Update status for dashboard generation
-        STEPS_COMPLETED=4
+        export STEPS_COMPLETED=4
         update_analysis_status "running" "Generating interactive dashboard..." "generating"
         
         # Create output directory
