@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Optimized Dashboard Generator for CPPCheck Studio
-Focuses on essential features and developer workflow
+Optimized Dashboard Generator for CPPCheck Studio - FIXED VERSION
+Restores code preview modal functionality while keeping optimizations
 """
 
 import json
@@ -464,6 +464,7 @@ class OptimizedDashboardGenerator:
             align-items: flex-start;
             gap: 1rem;
             transition: background 0.2s;
+            cursor: pointer;
         }}
         
         .issue-item:hover {{
@@ -541,6 +542,142 @@ class OptimizedDashboardGenerator:
             background: rgba(25, 135, 84, 0.1);
             color: var(--success-color);
             border-color: rgba(25, 135, 84, 0.3);
+        }}
+        
+        /* Modal */
+        .modal {{
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }}
+        
+        .modal.show {{
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 1;
+        }}
+        
+        .modal-content {{
+            background: var(--bg-primary);
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 50px rgba(0, 0, 0, 0.3);
+            max-width: 90%;
+            max-height: 90%;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transform: scale(0.9);
+            transition: transform 0.3s;
+        }}
+        
+        .modal.show .modal-content {{
+            transform: scale(1);
+        }}
+        
+        .modal-header {{
+            padding: 1rem;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }}
+        
+        .modal-title {{
+            font-size: 1.125rem;
+            font-weight: 600;
+        }}
+        
+        .modal-close {{
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            padding: 0;
+            width: 2rem;
+            height: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.25rem;
+            transition: all 0.2s;
+        }}
+        
+        .modal-close:hover {{
+            background: var(--hover-bg);
+            color: var(--text-primary);
+        }}
+        
+        .modal-body {{
+            padding: 1.5rem;
+            overflow-y: auto;
+            max-height: 70vh;
+        }}
+        
+        .issue-details {{
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }}
+        
+        .detail-section {{
+            background: var(--bg-secondary);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid var(--border-color);
+        }}
+        
+        .detail-section h4 {{
+            margin: 0 0 0.75rem 0;
+            font-size: 1rem;
+            color: var(--text-primary);
+        }}
+        
+        .code-context {{
+            background: var(--bg-tertiary);
+            border-radius: 0.5rem;
+            overflow: hidden;
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
+        }}
+        
+        .code-line {{
+            display: flex;
+            padding: 0.25rem 0.5rem;
+            transition: background 0.2s;
+        }}
+        
+        .code-line:hover {{
+            background: var(--hover-bg);
+        }}
+        
+        .code-line.highlighted {{
+            background: rgba(255, 193, 7, 0.2);
+            border-left: 3px solid var(--warning-color);
+        }}
+        
+        .line-number {{
+            color: var(--text-secondary);
+            min-width: 3rem;
+            text-align: right;
+            padding-right: 1rem;
+            user-select: none;
+        }}
+        
+        .line-content {{
+            flex: 1;
+            white-space: pre;
+            overflow-x: auto;
         }}
         
         /* Theme Toggle */
@@ -623,6 +760,11 @@ class OptimizedDashboardGenerator:
             
             .issue-item {{
                 flex-direction: column;
+            }}
+            
+            .modal-content {{
+                max-width: 95%;
+                max-height: 95%;
             }}
         }}
         
@@ -713,6 +855,19 @@ class OptimizedDashboardGenerator:
         </div>
     </div>
     
+    <!-- Modal for code preview -->
+    <div class="modal" id="codeModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">Issue Details</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Content will be inserted here -->
+            </div>
+        </div>
+    </div>
+    
     <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
         <span id="themeIcon">🌙</span>
     </button>
@@ -750,6 +905,7 @@ class OptimizedDashboardGenerator:
                 }}
                 if (e.key === 'Escape') {{
                     document.getElementById('searchInput').blur();
+                    closeModal();
                 }}
                 if (e.key >= '1' && e.key <= '5' && e.ctrlKey) {{
                     e.preventDefault();
@@ -921,6 +1077,13 @@ class OptimizedDashboardGenerator:
                 item.classList.add('fixed');
             }}
             
+            // Click on row shows details modal
+            item.onclick = (e) => {{
+                if (!e.target.classList.contains('action-btn')) {{
+                    showIssueDetails(issue);
+                }}
+            }};
+            
             // Severity badge
             const severity = document.createElement('div');
             severity.className = `issue-severity ${{issue.severity || 'style'}}`;
@@ -936,7 +1099,7 @@ class OptimizedDashboardGenerator:
             message.className = 'issue-message';
             message.textContent = issue.message || 'No message';
             
-            // Inline code preview
+            // Inline code preview (1-2 lines)
             const codeLines = getInlineCode(issue);
             if (codeLines.length > 0) {{
                 const codePreview = document.createElement('div');
@@ -965,14 +1128,20 @@ class OptimizedDashboardGenerator:
             // View button
             const viewBtn = document.createElement('button');
             viewBtn.className = 'action-btn';
-            viewBtn.textContent = state.viewed.has(issue.unique_id) ? '✓' : '👁';
-            viewBtn.onclick = () => markAsViewed(issue);
+            viewBtn.textContent = state.viewed.has(issue.unique_id) ? '✓ Viewed' : 'View';
+            viewBtn.onclick = (e) => {{
+                e.stopPropagation();
+                markAsViewed(issue);
+            }};
             
             // Fix button
             const fixBtn = document.createElement('button');
             fixBtn.className = 'action-btn';
             fixBtn.textContent = state.fixed.has(issue.unique_id) ? '✓ Fixed' : 'Fix';
-            fixBtn.onclick = () => markAsFixed(issue);
+            fixBtn.onclick = (e) => {{
+                e.stopPropagation();
+                markAsFixed(issue);
+            }};
             
             actions.appendChild(viewBtn);
             actions.appendChild(fixBtn);
@@ -984,16 +1153,16 @@ class OptimizedDashboardGenerator:
                 fixSuggestion.className = 'action-btn fix-suggestion';
                 fixSuggestion.textContent = '💡';
                 fixSuggestion.title = fix.suggestion;
-                fixSuggestion.onclick = () => showFixSuggestion(fix);
+                fixSuggestion.onclick = (e) => {{
+                    e.stopPropagation();
+                    showFixSuggestion(fix);
+                }};
                 actions.appendChild(fixSuggestion);
             }}
             
             item.appendChild(severity);
             item.appendChild(content);
             item.appendChild(actions);
-            
-            // Mark as viewed on click
-            item.onclick = () => markAsViewed(issue);
             
             return item;
         }}
@@ -1005,6 +1174,87 @@ class OptimizedDashboardGenerator:
                 container.appendChild(issueEl);
             }});
         }}
+        
+        // Modal functions
+        function showIssueDetails(issue) {{
+            const modal = document.getElementById('codeModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalBody = document.getElementById('modalBody');
+            
+            modalTitle.textContent = `${{issue.file || 'Unknown'}}:${{issue.line || '?'}}`;
+            
+            let content = `
+                <div class="issue-details">
+                    <div class="detail-section">
+                        <h4>Issue Information</h4>
+                        <p><strong>Message:</strong> ${{escapeHtml(issue.message || 'No message')}}</p>
+                        <p><strong>Severity:</strong> <span class="issue-severity ${{issue.severity || 'style'}}" style="background: ${{getSeverityColor(issue.severity)}}; color: white;">${{issue.severity || 'style'}}</span></p>
+                        <p><strong>ID:</strong> ${{issue.id || 'unknown'}}</p>
+                        <p><strong>Location:</strong> Line ${{issue.line || '?'}}, Column ${{issue.column || '?'}}</p>
+                    </div>
+            `;
+            
+            // Add code context if available
+            if (issue.context && issue.context.code_lines) {{
+                content += `
+                    <div class="detail-section">
+                        <h4>Code Context</h4>
+                        <div class="code-context">
+                `;
+                
+                issue.context.code_lines.forEach(line => {{
+                    const isHighlighted = line.line_number === issue.line;
+                    content += `
+                        <div class="code-line ${{isHighlighted ? 'highlighted' : ''}}">
+                            <span class="line-number">${{line.line_number}}</span>
+                            <span class="line-content">${{escapeHtml(line.content)}}</span>
+                        </div>
+                    `;
+                }});
+                
+                content += `
+                        </div>
+                    </div>
+                `;
+            }}
+            
+            // Add quick fix if available
+            const fix = getFixSuggestion(issue);
+            if (fix) {{
+                content += `
+                    <div class="detail-section">
+                        <h4>Quick Fix Suggestion</h4>
+                        <p>${{fix.suggestion}}</p>
+                        <code class="issue-code">${{escapeHtml(fix.template)}}</code>
+                        <button class="action-btn fix-suggestion" onclick="copyToClipboard('${{escapeHtml(fix.template)}}')">
+                            Copy Fix Template
+                        </button>
+                    </div>
+                `;
+            }}
+            
+            content += '</div>';
+            
+            modalBody.innerHTML = content;
+            modal.classList.add('show');
+            
+            // Mark as viewed when opening details
+            if (!state.viewed.has(issue.unique_id)) {{
+                markAsViewed(issue);
+            }}
+        }}
+        
+        function closeModal() {{
+            const modal = document.getElementById('codeModal');
+            modal.classList.remove('show');
+        }}
+        
+        // Click outside modal to close
+        document.getElementById('codeModal').addEventListener('click', (e) => {{
+            if (e.target.classList.contains('modal')) {{
+                closeModal();
+            }}
+        }});
         
         // Filtering
         function getFilteredIssues() {{
@@ -1176,7 +1426,21 @@ class OptimizedDashboardGenerator:
         
         function showFixSuggestion(fix) {{
             showToast(`${{fix.suggestion}}: ${{fix.template}}`);
-            navigator.clipboard.writeText(fix.template);
+            copyToClipboard(fix.template);
+        }}
+        
+        function escapeHtml(text) {{
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }}
+        
+        function copyToClipboard(text) {{
+            navigator.clipboard.writeText(text).then(() => {{
+                showToast('Copied to clipboard!');
+            }}).catch(() => {{
+                showToast('Failed to copy to clipboard');
+            }});
         }}
         
         function showToast(message) {{
@@ -1213,13 +1477,19 @@ class OptimizedDashboardGenerator:
 Keyboard Shortcuts:
 • / - Focus search
 • Ctrl+1-5 - Filter by severity
-• Esc - Unfocus search
+• Esc - Close modal or unfocus search
 
 Search Examples:
 • "error in .h" - Errors in header files
 • "warning controller" - Warnings with "controller"
 • "style multiply" - Style issues with "multiply"
 • ".cpp" - Issues in .cpp files
+
+Actions:
+• Click issue row - View full details and code context
+• View button - Mark as viewed
+• Fix button - Mark as fixed
+• 💡 button - Copy quick fix template
             `;
             alert(helpText);
         }}
@@ -1236,7 +1506,7 @@ Search Examples:
 
 def main():
     if len(sys.argv) != 3:
-        print("Usage: python generate-optimized-dashboard.py <input.json> <output.html>")
+        print("Usage: python generate-optimized-dashboard-fixed.py <input.json> <output.html>")
         sys.exit(1)
     
     input_file = sys.argv[1]
