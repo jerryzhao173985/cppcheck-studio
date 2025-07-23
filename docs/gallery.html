@@ -340,8 +340,9 @@
                     realAnalyses = rawAnalyses.map(normalizeAnalysisData);
                     
                     // Filter out analyses without proper data
+                    // Note: Allow filesAnalyzed to be 0 (valid for repos with no C++ files)
                     realAnalyses = realAnalyses.filter(a => 
-                        a.repository && a.analysis_id && a.filesAnalyzed > 0
+                        a.repository && a.analysis_id && a.filesAnalyzed >= 0
                     );
                     
                     // Use real data instead of sample data

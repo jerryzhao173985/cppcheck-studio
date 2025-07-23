@@ -136,8 +136,10 @@ jobs:
         chmod +x status_updates/update_status.sh
         source status_updates/update_status.sh
         
-        # Initial status
+        # Initial status with default values
         STEPS_COMPLETED=0
+        FILE_COUNT=0
+        ISSUE_COUNT=0
         update_analysis_status "queued" "Analysis request received" "initializing"
     
     - name: Clone and analyze repository
@@ -299,10 +301,14 @@ jobs:
         echo "📊 JSON file size: ${JSON_SIZE} bytes"
         
         # Get issue count safely
-        ISSUE_COUNT=$(python3 -c "import json; data = {}; \
-        try: data = json.load(open('analysis.json', 'r')); \
-        except: pass; \
-        print(len(data.get('issues', [])))" || echo "0")
+        ISSUE_COUNT=$(python3 -c "
+import json
+try:
+    data = json.load(open('analysis.json'))
+    print(len(data.get('issues', [])))
+except:
+    print('0')
+" || echo "0")
         
         echo "ISSUE_COUNT=${ISSUE_COUNT}" >> $GITHUB_ENV
         echo "📊 Found ${ISSUE_COUNT} issues"
@@ -328,12 +334,17 @@ jobs:
         
         # Show first few files for debugging
         echo "📄 Sample files from analysis:"
-        python3 -c "import json; \
-        try: \
-            data = json.load(open('../analysis.json', 'r')); \
-            files = set(issue.get('file', '') for issue in data.get('issues', [])[:10]); \
-            [print(f'  - {f}') for f in list(files)[:5] if f]; \
-        except: print('Could not list files')" || echo "Could not list files"
+        python3 -c "
+import json
+try:
+    data = json.load(open('../analysis.json'))
+    files = set(issue.get('file', '') for issue in data.get('issues', [])[:10])
+    for f in list(files)[:5]:
+        if f:
+            print(f'  - {f}')
+except:
+    print('Could not list files')
+" || echo "Could not list files"
         
         python3 ../cppcheck-studio/add-code-context.py ../analysis.json ../analysis-with-context.json --base-path "$REPO_PATH" || {
           echo "⚠️ Failed to add code context, using original analysis"
