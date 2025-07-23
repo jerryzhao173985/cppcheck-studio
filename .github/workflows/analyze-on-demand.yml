@@ -301,6 +301,10 @@ jobs:
         
         cd ..
         
+        # Set and verify working directory
+        WORK_DIR=$(pwd)
+        echo "WORK_DIR=${WORK_DIR}" >> $GITHUB_ENV
+        
         # Debug: Show current directory structure
         echo "📁 Current directory: $(pwd)"
         echo "📂 Directory contents:"
@@ -480,6 +484,10 @@ jobs:
         export WORKFLOW_RUN_ID="${{ github.run_id }}"
         export WORKFLOW_RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
         
+        # Ensure we're in the correct directory (where analysis files were created)
+        cd ${WORK_DIR}
+        echo "📁 Working directory: $(pwd)"
+        
         source $GITHUB_WORKSPACE/status_updates/update_status.sh
         
         # Variables are already in environment from previous steps
@@ -496,7 +504,9 @@ jobs:
         
         # Verify analysis files exist
         if [ ! -f analysis-with-context.json ]; then
-          echo "❌ analysis-with-context.json not found!"
+          echo "❌ analysis-with-context.json not found in $(pwd)!"
+          echo "📂 Looking for analysis files:"
+          find . -name "analysis*.json" -type f | head -10
           if [ -f analysis.json ]; then
             echo "⚠️ Using analysis.json instead"
             cp analysis.json analysis-with-context.json
@@ -652,6 +662,9 @@ jobs:
       if: github.ref == 'refs/heads/main'
       run: |
         set -euo pipefail
+        # Ensure we're in the correct directory
+        cd ${WORK_DIR}
+        
         # Clone the repo with authentication
         git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git deploy-repo
         cd deploy-repo
@@ -735,6 +748,9 @@ jobs:
       if: always()
       run: |
         set -euo pipefail
+        # Ensure we're in the correct directory
+        cd ${WORK_DIR:-$GITHUB_WORKSPACE}
+        
         DASHBOARD_URL="https://jerryzhao173985.github.io/cppcheck-studio/results/${ANALYSIS_ID}/index.html"
         
         # Create job summary using script
