@@ -28,6 +28,7 @@ This PR transforms the CPPCheck Studio CI/CD pipeline from a basic setup to a **
 - **Pre-commit Hooks**: Local validation before push
 - **Dependabot**: Automated dependency updates
 - **Comprehensive Documentation**: README, best practices, and guides
+- **Virtual Scrolling Dashboard**: Configured to use the best dashboard implementation (generate-standalone-virtual-dashboard.py)
 
 ## 📊 Impact
 
