@@ -21,8 +21,8 @@ on:
       max_files:
         description: 'Maximum files to analyze'
         required: false
-        type: number
-        default: 500
+        type: string
+        default: '500'
       callback_url:
         description: 'URL to POST results to when complete'
         required: false
@@ -42,11 +42,18 @@ jobs:
     steps:
     - name: Parse inputs
       run: |
+        # Set default values first
+        echo "REPO=" >> $GITHUB_ENV
+        echo "BRANCH=main" >> $GITHUB_ENV
+        echo "MAX_FILES=500" >> $GITHUB_ENV
+        echo "CALLBACK_URL=" >> $GITHUB_ENV
+        echo "ANALYSIS_ID=" >> $GITHUB_ENV
+        
         # Handle both workflow_dispatch and repository_dispatch
         if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
           echo "REPO=${{ github.event.client_payload.repository }}" >> $GITHUB_ENV
           echo "BRANCH=${{ github.event.client_payload.branch || 'main' }}" >> $GITHUB_ENV
-          echo "MAX_FILES=${{ github.event.client_payload.max_files || 500 }}" >> $GITHUB_ENV
+          echo "MAX_FILES=${{ github.event.client_payload.max_files || '500' }}" >> $GITHUB_ENV
           echo "CALLBACK_URL=${{ github.event.client_payload.callback_url }}" >> $GITHUB_ENV
           if [ -n "${{ github.event.client_payload.analysis_id }}" ]; then
             echo "ANALYSIS_ID=${{ github.event.client_payload.analysis_id }}" >> $GITHUB_ENV
@@ -55,8 +62,8 @@ jobs:
           fi
         else
           echo "REPO=${{ github.event.inputs.repository }}" >> $GITHUB_ENV
-          echo "BRANCH=${{ github.event.inputs.branch }}" >> $GITHUB_ENV
-          echo "MAX_FILES=${{ github.event.inputs.max_files }}" >> $GITHUB_ENV
+          echo "BRANCH=${{ github.event.inputs.branch || 'main' }}" >> $GITHUB_ENV
+          echo "MAX_FILES=${{ github.event.inputs.max_files || '500' }}" >> $GITHUB_ENV
           echo "CALLBACK_URL=${{ github.event.inputs.callback_url }}" >> $GITHUB_ENV
           
           # Use provided analysis ID or generate one

@@ -11,8 +11,8 @@ on:
       max_files:
         description: 'Maximum files to analyze'
         required: false
-        type: number
-        default: 200
+        type: string
+        default: '200'
 
 jobs:
   analyze:

@@ -6,8 +6,8 @@ on:
       depth:
         description: 'Clone depth (0 for full history)'
         required: false
-        type: number
-        default: 1
+        type: string
+        default: '1'
       components:
         description: 'Components to analyze (comma-separated: selforg,ode_robots,opende,ga_tools,configurator)'
         required: false
@@ -16,8 +16,8 @@ on:
       max_issues:
         description: 'Maximum issues to include in dashboard'
         required: false
-        type: number
-        default: 5000
+        type: string
+        default: '5000'
 
 jobs:
   analyze-lpzrobots:

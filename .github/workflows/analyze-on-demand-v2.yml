@@ -17,7 +17,7 @@ on:
         description: 'Maximum files to analyze'
         required: false
         default: '5000'
-        type: number
+        type: string
       callback_url:
         description: 'Webhook URL for completion notification'
         required: false

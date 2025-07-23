@@ -21,8 +21,8 @@ on:
       max_files:
         description: 'Maximum files to analyze (for large repos)'
         required: false
-        type: number
-        default: 100
+        type: string
+        default: '100'
 
 jobs:
   analyze-external:
