@@ -141,16 +141,23 @@ jobs:
         set -e  # Exit on any error
         source status_updates/update_status.sh
         
+        # Check if repository is provided
+        if [ -z "${{ env.REPO }}" ]; then
+          echo "❌ Error: No repository provided!"
+          update_analysis_status "failed" "No repository provided" "failed"
+          exit 1
+        fi
+        
         echo "🔍 Analyzing repository: ${{ env.REPO }}"
         update_analysis_status "running" "Starting repository analysis for ${{ env.REPO }}" "cloning"
         
         # Get default branch if not specified
-        if [ -z "${{ env.BRANCH }}" ] || [ "${{ env.BRANCH }}" = "main" ]; then
-          DEFAULT_BRANCH=$(curl -s https://api.github.com/repos/${{ env.REPO }} | jq -r .default_branch)
+        if [ -z "${{ env.BRANCH }}" ] || [ "${{ env.BRANCH }}" = "main" ] || [ "${{ env.BRANCH }}" = "" ]; then
+          DEFAULT_BRANCH=$(curl -s https://api.github.com/repos/${{ env.REPO }} | jq -r .default_branch || echo "main")
           if [ "$DEFAULT_BRANCH" != "null" ] && [ -n "$DEFAULT_BRANCH" ]; then
             BRANCH=$DEFAULT_BRANCH
           else
-            BRANCH="${{ env.BRANCH }}"
+            BRANCH="main"
           fi
         else
           BRANCH="${{ env.BRANCH }}"
@@ -260,7 +267,7 @@ jobs:
           exit 1
         fi
         
-        XML_SIZE=$(stat -f%z cppcheck-results.xml 2>/dev/null || stat -c%s cppcheck-results.xml)
+        XML_SIZE=$(stat -c%s cppcheck-results.xml 2>/dev/null || stat -f%z cppcheck-results.xml 2>/dev/null || echo "0")
         echo "📊 XML file size: ${XML_SIZE} bytes"
         
         if [ ${XML_SIZE} -lt 100 ]; then
@@ -284,11 +291,19 @@ jobs:
           exit 1
         fi
         
-        JSON_SIZE=$(stat -f%z analysis.json 2>/dev/null || stat -c%s analysis.json)
+        JSON_SIZE=$(stat -c%s analysis.json 2>/dev/null || stat -f%z analysis.json 2>/dev/null || echo "0")
         echo "📊 JSON file size: ${JSON_SIZE} bytes"
         
         # Get issue count safely
-        ISSUE_COUNT=$(python3 -c "import json, sys; data = {}; exec('try:\n    with open(\"analysis.json\", \"r\") as f: data = json.load(f)\nexcept Exception as e:\n    print(f\"Error: {e}\", file=sys.stderr)'); print(len(data.get('issues', [])))" || echo "0")
+        ISSUE_COUNT=$(python3 -c "
+import json
+try:
+    with open('analysis.json', 'r') as f:
+        data = json.load(f)
+    print(len(data.get('issues', [])))
+except Exception as e:
+    print('0')
+" || echo "0")
         
         echo "ISSUE_COUNT=${ISSUE_COUNT}" >> $GITHUB_ENV
         echo "📊 Found ${ISSUE_COUNT} issues"
@@ -314,7 +329,18 @@ jobs:
         
         # Show first few files for debugging
         echo "📄 Sample files from analysis:"
-        python3 -c "import json; data = json.load(open('../analysis.json', 'r')); files = set(issue.get('file', '') for issue in data.get('issues', [])[:10]); [print(f'  - {f}') for f in list(files)[:5] if f]" || echo "Could not list files"
+        python3 -c "
+import json
+try:
+    with open('../analysis.json', 'r') as f:
+        data = json.load(f)
+    files = set(issue.get('file', '') for issue in data.get('issues', [])[:10])
+    for f in list(files)[:5]:
+        if f:
+            print(f'  - {f}')
+except Exception:
+    print('Could not list files')
+" || echo "Could not list files"
         
         python3 ../cppcheck-studio/add-code-context.py ../analysis.json ../analysis-with-context.json --base-path "$REPO_PATH" || {
           echo "⚠️ Failed to add code context, using original analysis"
@@ -395,7 +421,7 @@ jobs:
         
         echo "📊 Analysis file info:"
         ls -la analysis-with-context.json
-        ANALYSIS_SIZE=$(stat -f%z analysis-with-context.json 2>/dev/null || stat -c%s analysis-with-context.json)
+        ANALYSIS_SIZE=$(stat -c%s analysis-with-context.json 2>/dev/null || stat -f%z analysis-with-context.json 2>/dev/null || echo "0")
         echo "📊 Analysis file size: ${ANALYSIS_SIZE} bytes"
         
         # Check if analysis has issues
@@ -466,7 +492,7 @@ jobs:
           exit 1
         fi
         
-        DASHBOARD_SIZE=$(stat -f%z output/dashboard-${{ env.ANALYSIS_ID }}.html 2>/dev/null || stat -c%s output/dashboard-${{ env.ANALYSIS_ID }}.html)
+        DASHBOARD_SIZE=$(stat -c%s output/dashboard-${{ env.ANALYSIS_ID }}.html 2>/dev/null || stat -f%z output/dashboard-${{ env.ANALYSIS_ID }}.html 2>/dev/null || echo "0")
         echo "📊 Dashboard file size: ${DASHBOARD_SIZE} bytes"
         
         # Generate summary (with error handling)
