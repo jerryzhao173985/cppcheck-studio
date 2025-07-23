@@ -92,10 +92,57 @@ jobs:
         
         cd ../..
 
+    - name: Setup status tracking
+      run: |
+        # Create function for status updates
+        mkdir -p status_updates
+        
+        # Define status update function
+        cat > status_updates/update_status.sh << 'EOF'
+        #!/bin/bash
+        update_analysis_status() {
+            local status=$1
+            local message=$2
+            local step=$3
+            
+            cat > status_updates/current_status.json << EOJSON
+        {
+          "analysis_id": "${ANALYSIS_ID}",
+          "repository": "${REPO}",
+          "status": "${status}",
+          "step": "${step}",
+          "workflow_run_id": "${{ github.run_id }}",
+          "workflow_run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+          "updated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "message": "${message}",
+          "progress": {
+            "steps_completed": ${STEPS_COMPLETED:-0},
+            "total_steps": 5,
+            "current_step": "${step}",
+            "files_found": ${FILE_COUNT:-0},
+            "issues_found": ${ISSUE_COUNT:-0}
+          }
+        }
+        EOJSON
+            
+            echo "📊 Status Update: ${status} - ${message}"
+        }
+        EOF
+        
+        chmod +x status_updates/update_status.sh
+        source status_updates/update_status.sh
+        
+        # Initial status
+        STEPS_COMPLETED=0
+        update_analysis_status "queued" "Analysis request received" "initializing"
+    
     - name: Clone and analyze repository
       run: |
         set -e  # Exit on any error
+        source status_updates/update_status.sh
+        
         echo "🔍 Analyzing repository: ${{ env.REPO }}"
+        update_analysis_status "running" "Starting repository analysis for ${{ env.REPO }}" "cloning"
         
         # Get default branch if not specified
         if [ -z "${{ env.BRANCH }}" ] || [ "${{ env.BRANCH }}" = "main" ]; then
@@ -135,6 +182,10 @@ jobs:
         echo "📊 Repository structure:"
         ls -la | head -10
         
+        # Update status after successful clone
+        STEPS_COMPLETED=1
+        update_analysis_status "running" "Repository cloned successfully, searching for C++ files..." "searching"
+        
         # Find C++ files
         echo "🔎 Searching for C++ files..."
         find . -type f \( -name "*.cpp" -o -name "*.cc" -o -name "*.cxx" -o -name "*.c" -o -name "*.h" -o -name "*.hpp" \) \
@@ -157,6 +208,10 @@ jobs:
         echo "✅ Found ${FILE_COUNT} C++ files to analyze"
         echo "📝 First 10 files:"
         head -10 cpp_files.txt
+        
+        # Update status after finding files
+        STEPS_COMPLETED=2
+        update_analysis_status "running" "Found ${FILE_COUNT} C++ files, starting static analysis..." "analyzing"
         
         # Run cppcheck
         echo "🔍 Running cppcheck analysis..."
@@ -235,23 +290,50 @@ except Exception as e:
           head -c 500 analysis.json
         fi
         
+        # Update status after analysis
+        STEPS_COMPLETED=3
+        update_analysis_status "running" "Analysis complete: found ${ISSUE_COUNT} issues in ${FILE_COUNT} files" "processing"
+        
         # Add code context
         echo "📝 Adding code context..."
         cd target-repo
-        python3 ../cppcheck-studio/add-code-context.py ../analysis.json ../analysis-with-context.json || {
+        REPO_PATH=$(pwd)
+        echo "📁 Repository path: $REPO_PATH"
+        
+        # Show first few files for debugging
+        echo "📄 Sample files from analysis:"
+        python3 -c "
+import json
+with open('../analysis.json', 'r') as f:
+    data = json.load(f)
+    files = set(issue.get('file', '') for issue in data.get('issues', [])[:10])
+    for f in list(files)[:5]:
+        if f:
+            print(f'  - {f}')
+" || echo "Could not list files"
+        
+        python3 ../cppcheck-studio/add-code-context.py ../analysis.json ../analysis-with-context.json --base-path "$REPO_PATH" || {
           echo "⚠️ Failed to add code context, using original analysis"
           cp ../analysis.json ../analysis-with-context.json
         }
         cd ..
 
-    - name: Create status update
-      if: always()
+    - name: Push status updates to GitHub Pages
+      if: github.ref == 'refs/heads/main'
       run: |
-        # Create status directory in output
-        mkdir -p output/status
+        # Clone the repo with authentication  
+        git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git status-repo
+        cd status-repo
         
-        # Create status file
-        cat > output/status/${{ env.ANALYSIS_ID }}.json << EOF
+        # Create status directory
+        mkdir -p docs/api/status
+        
+        # Copy latest status if it exists
+        if [ -f ../status_updates/current_status.json ]; then
+          cp ../status_updates/current_status.json docs/api/status/${{ env.ANALYSIS_ID }}.json
+        else
+          # Fallback status
+          cat > docs/api/status/${{ env.ANALYSIS_ID }}.json << EOF
         {
           "analysis_id": "${{ env.ANALYSIS_ID }}",
           "repository": "${{ env.REPO }}",
@@ -259,13 +341,33 @@ except Exception as e:
           "workflow_run_id": "${{ github.run_id }}",
           "workflow_run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
           "updated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-          "message": "Generating dashboard..."
+          "message": "Processing analysis...",
+          "progress": {
+            "steps_completed": 3,
+            "total_steps": 5,
+            "current_step": "processing"
+          }
         }
         EOF
+        fi
+        
+        # Commit and push status update
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        git add docs/api/status/
+        git commit -m "Update analysis status for ${{ env.REPO }} (#${{ env.ANALYSIS_ID }})" || echo "No changes"
+        git push || echo "Push failed, likely concurrent update"
+        
+        cd ..
         
     - name: Generate dashboard
       run: |
         set -e  # Exit on error
+        source status_updates/update_status.sh
+        
+        # Update status for dashboard generation
+        STEPS_COMPLETED=4
+        update_analysis_status "running" "Generating interactive dashboard..." "generating"
         
         # Create output directory
         mkdir -p output
@@ -378,8 +480,14 @@ except Exception as e:
           echo "Please check the analysis.json file" >> output/report.md
         }
         
-        # Create metadata
-        echo "📝 Creating metadata..."
+        # Create metadata with issue breakdown
+        echo "📝 Creating metadata with issue breakdown..."
+        
+        # Get issue breakdown
+        ISSUE_BREAKDOWN=$(python3 cppcheck-studio/scripts/extract-issue-breakdown.py analysis.json || echo '{"total":0,"error":0,"warning":0,"style":0,"performance":0,"portability":0,"information":0}')
+        echo "📊 Issue breakdown: $ISSUE_BREAKDOWN"
+        
+        # Create gallery-compatible metadata
         cat > output/metadata.json << EOF
         {
           "analysis_id": "${{ env.ANALYSIS_ID }}",
@@ -387,9 +495,12 @@ except Exception as e:
           "branch": "${{ env.BRANCH }}",
           "commit": "${{ env.COMMIT_SHA }}",
           "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "filesAnalyzed": ${{ env.FILE_COUNT }},
           "files_analyzed": ${{ env.FILE_COUNT }},
+          "issues": ${ISSUE_BREAKDOWN},
           "issues_found": ${{ env.ISSUE_COUNT }},
           "max_files": ${{ env.MAX_FILES_INT }},
+          "dashboardUrl": "https://jerryzhao173985.github.io/cppcheck-studio/results/${{ env.ANALYSIS_ID }}/index.html",
           "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/${{ env.ANALYSIS_ID }}/index.html",
           "dashboard_size": ${DASHBOARD_SIZE},
           "analysis_size": ${ANALYSIS_SIZE}
@@ -427,18 +538,27 @@ except Exception as e:
         cp ../output/metadata.json docs/results/${{ env.ANALYSIS_ID }}/
         cp ../output/metadata.json docs/api/analyses/${{ env.ANALYSIS_ID }}.json
         
-        # Create final status
+        # Create final status with full details
         cat > docs/api/status/${{ env.ANALYSIS_ID }}.json << EOF
         {
           "analysis_id": "${{ env.ANALYSIS_ID }}",
           "repository": "${{ env.REPO }}",
           "status": "completed",
+          "step": "completed",
           "workflow_run_id": "${{ github.run_id }}",
           "workflow_run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
           "completed_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
           "files_analyzed": ${{ env.FILE_COUNT }},
+          "filesAnalyzed": ${{ env.FILE_COUNT }},
           "issues_found": ${{ env.ISSUE_COUNT }},
-          "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/${{ env.ANALYSIS_ID }}/index.html"
+          "issues": $(cat ../output/metadata.json | jq -c .issues || echo '{"total":0}'),
+          "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/${{ env.ANALYSIS_ID }}/index.html",
+          "dashboardUrl": "https://jerryzhao173985.github.io/cppcheck-studio/results/${{ env.ANALYSIS_ID }}/index.html",
+          "progress": {
+            "steps_completed": 5,
+            "total_steps": 5,
+            "current_step": "completed"
+          }
         }
         EOF
         

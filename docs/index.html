@@ -859,23 +859,60 @@
                         const data = statusCheck.data;
                         
                         if (statusCheck.status === 'running') {
-                            // Update timeline for running status
-                            updateTimelineStatus('running', 
-                                `Analyzing <strong>${repo}</strong>...<br>` +
-                                `🕐 Elapsed: ${elapsedStr}<br>` +
-                                (data.workflow_run_url ? 
-                                    `<a href="${data.workflow_run_url}" target="_blank">View Workflow →</a>` : '')
-                            );
+                            // Check detailed step information
+                            const step = data.step || 'running';
+                            const progress = data.progress || {};
                             
-                            // Check if generating dashboard
-                            if (data.message && data.message.includes('dashboard')) {
-                                updateTimelineStatus('generating', 
-                                    `Generating interactive dashboard...<br>` +
-                                    `🕐 Elapsed: ${elapsedStr}`
-                                );
+                            // Map steps to timeline stages
+                            let timelineStep = 'running';
+                            let message = data.message || `Analyzing <strong>${repo}</strong>...`;
+                            
+                            switch(step) {
+                                case 'initializing':
+                                case 'cloning':
+                                    timelineStep = 'queued';
+                                    message = `${data.message}<br>🕐 Elapsed: ${elapsedStr}`;
+                                    break;
+                                    
+                                case 'searching':
+                                case 'analyzing':
+                                    timelineStep = 'running';
+                                    if (progress.files_found) {
+                                        message = `${data.message}<br>` +
+                                                `📁 Files: ${progress.files_found}<br>` +
+                                                `🕐 Elapsed: ${elapsedStr}`;
+                                    }
+                                    break;
+                                    
+                                case 'processing':
+                                    timelineStep = 'running';
+                                    if (progress.issues_found !== undefined) {
+                                        message = `${data.message}<br>` +
+                                                `📊 Issues found: ${progress.issues_found}<br>` +
+                                                `🕐 Elapsed: ${elapsedStr}`;
+                                    }
+                                    break;
+                                    
+                                case 'generating':
+                                    timelineStep = 'generating';
+                                    message = `${data.message}<br>🕐 Elapsed: ${elapsedStr}`;
+                                    break;
                             }
                             
-                            showStatus('info', `🔄 Analysis in progress... (${elapsedStr} elapsed)`);
+                            // Add workflow link if available
+                            if (data.workflow_run_url) {
+                                message += `<br><a href="${data.workflow_run_url}" target="_blank">View Workflow →</a>`;
+                            }
+                            
+                            updateTimelineStatus(timelineStep, message);
+                            
+                            // Update progress bar if we have step information
+                            if (progress.steps_completed && progress.total_steps) {
+                                const percent = Math.round((progress.steps_completed / progress.total_steps) * 100);
+                                showStatus('info', `🔄 Analysis ${percent}% complete... (${elapsedStr} elapsed)`);
+                            } else {
+                                showStatus('info', `🔄 Analysis in progress... (${elapsedStr} elapsed)`);
+                            }
                             
                         } else if (statusCheck.status === 'completed') {
                             // Analysis complete!

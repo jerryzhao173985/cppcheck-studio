@@ -294,19 +294,73 @@
         let currentView = 'card';
         let repoGroups = {};
         
+        function normalizeAnalysisData(analysis) {
+            // Handle both old and new data formats
+            const normalized = {
+                ...analysis,
+                // Map field names
+                filesAnalyzed: analysis.filesAnalyzed || analysis.files_analyzed || 0,
+                dashboardUrl: analysis.dashboardUrl || analysis.dashboard_url || '#',
+                
+                // Handle issue breakdown
+                issues: analysis.issues || {
+                    total: analysis.issues_found || 0,
+                    error: 0,
+                    warning: 0,
+                    style: 0,
+                    performance: 0,
+                    portability: 0,
+                    information: 0
+                }
+            };
+            
+            // Fix dashboard URL if needed (dashboard.html → index.html)
+            if (normalized.dashboardUrl.endsWith('/dashboard.html')) {
+                normalized.dashboardUrl = normalized.dashboardUrl.replace('/dashboard.html', '/index.html');
+            }
+            
+            // Ensure all required fields exist
+            if (typeof normalized.issues.total === 'undefined') {
+                normalized.issues.total = normalized.issues.error + normalized.issues.warning + 
+                                        normalized.issues.style + normalized.issues.performance +
+                                        normalized.issues.portability + normalized.issues.information;
+            }
+            
+            return normalized;
+        }
+        
         async function loadRealAnalyses() {
             try {
                 const response = await fetch('api/gallery.json?t=' + Date.now());
                 if (response.ok) {
                     const data = await response.json();
-                    realAnalyses = data.analyses || [];
-                    // Combine with sample data
-                    sampleAnalyses = [...realAnalyses];
+                    const rawAnalyses = data.analyses || [];
+                    
+                    // Normalize all analyses
+                    realAnalyses = rawAnalyses.map(normalizeAnalysisData);
+                    
+                    // Filter out analyses without proper data
+                    realAnalyses = realAnalyses.filter(a => 
+                        a.repository && a.analysis_id && a.filesAnalyzed > 0
+                    );
+                    
+                    // Use real data instead of sample data
+                    if (realAnalyses.length > 0) {
+                        sampleAnalyses = realAnalyses;
+                        console.log(`Loaded ${realAnalyses.length} real analyses`);
+                    } else {
+                        // Keep sample data if no real data
+                        console.log('No real analyses found, using sample data');
+                    }
+                    
                     processRepoGroups();
                     renderCurrentView();
+                } else {
+                    console.error('Failed to load gallery data:', response.status);
                 }
             } catch (e) {
-                console.log('Using sample data:', e);
+                console.error('Error loading real analyses:', e);
+                // Keep using sample data on error
             }
         }
         

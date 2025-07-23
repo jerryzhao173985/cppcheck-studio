@@ -73,9 +73,14 @@ def add_code_context_to_analysis(input_file, output_file, context_lines=5, base_
             possible_paths = [
                 file_path,  # Original path
                 os.path.join(base_path, file_path),  # Path relative to base
-                os.path.join(base_path, file_path.lstrip('./')),  # Remove leading ./
-                os.path.join(base_path, file_path.lstrip('/')),  # Remove leading /
             ]
+            
+            # Safely remove leading ./ or /
+            if file_path.startswith('./'):
+                possible_paths.append(os.path.join(base_path, file_path[2:]))
+            elif file_path.startswith('/') and not os.path.isabs(file_path):
+                # Only strip leading / if it's not an absolute path
+                possible_paths.append(os.path.join(base_path, file_path[1:]))
             
             # Also try removing common prefixes
             if file_path.startswith('target-repo/'):
