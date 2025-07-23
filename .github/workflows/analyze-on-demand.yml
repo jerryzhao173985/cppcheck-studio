@@ -326,6 +326,12 @@ jobs:
         
         # Convert to JSON
         echo "🔄 Converting XML to JSON..."
+        # Debug: Show paths before running the script
+        echo "📁 Working directory: $(pwd)"
+        echo "📂 Script location check:"
+        ls -la cppcheck-studio/xml2json-simple.py || echo "Script not found at expected location"
+        
+        # Run the script with the correct path
         python3 cppcheck-studio/xml2json-simple.py cppcheck-results.xml > analysis.json || {
           echo "❌ Failed to convert XML to JSON"
           echo "📝 XML content (first 500 chars):"
