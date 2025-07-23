@@ -284,8 +284,13 @@ jobs:
         export STEPS_COMPLETED=2
         update_analysis_status "running" "Found ${FILE_COUNT} C++ files, starting static analysis..." "analyzing"
         
-        # Run cppcheck
+        # Run cppcheck from inside target-repo to get clean paths
         echo "🔍 Running cppcheck analysis..."
+        cd target-repo
+        
+        # Create a new file list with relative paths (removing target-repo/ prefix)
+        sed 's|^target-repo/||' ../cpp_files.txt > cpp_files_relative.txt
+        
         cppcheck \
           --enable=all \
           --inconclusive \
@@ -293,7 +298,7 @@ jobs:
           --std=c++17 \
           --xml \
           --xml-version=2 \
-          --file-list=cpp_files.txt \
+          --file-list=cpp_files_relative.txt \
           -j $(nproc) \
           2> ../cppcheck-results.xml || {
           echo "⚠️ CPPCheck returned non-zero exit code (this is normal if issues were found)"
