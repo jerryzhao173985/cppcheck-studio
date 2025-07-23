@@ -391,7 +391,12 @@ jobs:
         
         # Add code context
         echo "📝 Adding code context..."
-        # Get repository path - we're already in the parent directory
+        # Get current directory path - this is where target-repo is located
+        BASE_PATH=$(pwd)
+        echo "BASE_PATH=${BASE_PATH}" >> $GITHUB_ENV
+        echo "📁 Base path: $BASE_PATH"
+        
+        # The repository path for reference
         REPO_PATH=$(pwd)/target-repo
         echo "REPO_PATH=${REPO_PATH}" >> $GITHUB_ENV
         echo "📁 Repository path: $REPO_PATH"
@@ -404,7 +409,8 @@ jobs:
         ADD_CONTEXT_SCRIPT=$(find . -name "add-code-context.py" -type f | head -1)
         if [ -n "$ADD_CONTEXT_SCRIPT" ]; then
           echo "📄 Using add-code-context.py at: $ADD_CONTEXT_SCRIPT"
-          python3 "$ADD_CONTEXT_SCRIPT" analysis.json analysis-with-context.json --base-path "$REPO_PATH" || {
+          # Use BASE_PATH (parent directory) not REPO_PATH to avoid double prefix
+          python3 "$ADD_CONTEXT_SCRIPT" analysis.json analysis-with-context.json --base-path "$BASE_PATH" || {
             echo "⚠️ Failed to add code context, using original analysis"
             cp analysis.json analysis-with-context.json
           }
