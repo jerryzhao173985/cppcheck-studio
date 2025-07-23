@@ -328,16 +328,33 @@ jobs:
         echo "🔄 Converting XML to JSON..."
         # Debug: Show paths before running the script
         echo "📁 Working directory: $(pwd)"
-        echo "📂 Script location check:"
-        ls -la cppcheck-studio/xml2json-simple.py || echo "Script not found at expected location"
+        echo "📂 GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
+        echo "📂 Looking for xml2json-simple.py in various locations:"
+        find . -name "xml2json-simple.py" -type f | head -5
         
-        # Run the script with the correct path
-        python3 cppcheck-studio/xml2json-simple.py cppcheck-results.xml > analysis.json || {
+        # The script should be at cppcheck-studio/xml2json-simple.py relative to current directory
+        if [ -f "cppcheck-studio/xml2json-simple.py" ]; then
+          echo "✅ Found script at: cppcheck-studio/xml2json-simple.py"
+          python3 cppcheck-studio/xml2json-simple.py cppcheck-results.xml > analysis.json
+        elif [ -f "$GITHUB_WORKSPACE/xml2json-simple.py" ]; then
+          echo "✅ Found script at: $GITHUB_WORKSPACE/xml2json-simple.py"
+          python3 "$GITHUB_WORKSPACE/xml2json-simple.py" cppcheck-results.xml > analysis.json
+        else
+          echo "❌ Could not find xml2json-simple.py!"
+          echo "📂 Directory structure:"
+          ls -la
+          echo "📂 Contents of cppcheck-studio:"
+          ls -la cppcheck-studio/ | head -20
+          exit 1
+        fi
+        
+        # Check if conversion succeeded
+        if [ ! -f analysis.json ] || [ ! -s analysis.json ]; then
           echo "❌ Failed to convert XML to JSON"
           echo "📝 XML content (first 500 chars):"
           head -c 500 cppcheck-results.xml
           exit 1
-        }
+        fi
         
         # Verify JSON output
         if [ ! -f analysis.json ]; then
