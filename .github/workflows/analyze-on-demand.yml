@@ -111,44 +111,15 @@ jobs:
         # Create function for status updates
         mkdir -p status_updates
         
-        # Create status update script with proper escaping
-        cat > status_updates/update_status.sh << 'SCRIPT_EOF'
-        #!/bin/bash
-        update_analysis_status() {
-            local status=$1
-            local message=$2
-            local step=$3
-            
-            # Use absolute path to ensure we write to the correct location
-            STATUS_DIR="$GITHUB_WORKSPACE/status_updates"
-            mkdir -p "$STATUS_DIR"
-            
-            cat > "$STATUS_DIR/current_status.json" << EOJSON
-        {
-          "analysis_id": "${ANALYSIS_ID}",
-          "repository": "${REPO}",
-          "status": "${status}",
-          "step": "${step}",
-          "workflow_run_id": "${{ github.run_id }}",
-          "workflow_run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-          "updated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-          "message": "${message}",
-          "progress": {
-            "steps_completed": ${STEPS_COMPLETED:-0},
-            "total_steps": 5,
-            "current_step": "${step}",
-            "files_found": ${FILE_COUNT:-0},
-            "issues_found": ${ISSUE_COUNT:-0}
-          }
-        }
-        EOJSON
-            
-            echo "📊 Status Update: ${status} - ${message}"
-        }
-        SCRIPT_EOF
+        # Set workflow variables for the status function
+        export WORKFLOW_RUN_ID="${{ github.run_id }}"
+        export WORKFLOW_RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
         
-        chmod +x status_updates/update_status.sh
-        source $GITHUB_WORKSPACE/status_updates/update_status.sh
+        # Use external script to create the status function
+        bash cppcheck-studio/scripts/create-status-function.sh
+        
+        # Source the created function
+        source status_updates/update_status.sh
         
         # Initial status with default values
         export STEPS_COMPLETED=0
@@ -161,6 +132,10 @@ jobs:
     - name: Clone and analyze repository
       run: |
         set -euo pipefail
+        # Set workflow variables
+        export WORKFLOW_RUN_ID="${{ github.run_id }}"
+        export WORKFLOW_RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        
         # Source the update script using absolute path
         source $GITHUB_WORKSPACE/status_updates/update_status.sh
         
@@ -374,23 +349,23 @@ jobs:
         if [ -f "$GITHUB_WORKSPACE/status_updates/current_status.json" ]; then
           cp "$GITHUB_WORKSPACE/status_updates/current_status.json" docs/api/status/${{ env.ANALYSIS_ID }}.json
         else
-          # Fallback status
+          # Fallback status  
           cat > docs/api/status/${ANALYSIS_ID}.json << EOF
-{
-  "analysis_id": "${ANALYSIS_ID}",
-  "repository": "${REPO}",
-  "status": "running",
-  "workflow_run_id": "${{ github.run_id }}",
-  "workflow_run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-  "updated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "message": "Processing analysis...",
-  "progress": {
-    "steps_completed": 3,
-    "total_steps": 5,
-    "current_step": "processing"
-  }
-}
-EOF
+            {
+              "analysis_id": "${ANALYSIS_ID}",
+              "repository": "${REPO}",
+              "status": "running",
+              "workflow_run_id": "${{ github.run_id }}",
+              "workflow_run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+              "updated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+              "message": "Processing analysis...",
+              "progress": {
+                "steps_completed": 3,
+                "total_steps": 5,
+                "current_step": "processing"
+              }
+            }
+          EOF
         fi
         
         # Commit and push status update
@@ -405,6 +380,10 @@ EOF
     - name: Generate dashboard
       run: |
         set -euo pipefail
+        # Set workflow variables
+        export WORKFLOW_RUN_ID="${{ github.run_id }}"
+        export WORKFLOW_RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        
         source $GITHUB_WORKSPACE/status_updates/update_status.sh
         
         # Variables are already in environment from previous steps
@@ -468,34 +447,34 @@ EOF
         # Last resort - create minimal dashboard
         if [ "$DASHBOARD_GENERATED" = "false" ]; then
           echo "⚠️ All generators failed, creating minimal dashboard..."
-          cat > output/dashboard-${ANALYSIS_ID}.html << 'EOHTML'
-<!DOCTYPE html>
-<html>
-<head>
-    <title>CPPCheck Analysis - ${REPO}</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        .header { background: #f0f0f0; padding: 20px; border-radius: 5px; }
-        .error { color: red; }
-        .info { color: blue; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>CPPCheck Analysis Results</h1>
-        <p><strong>Repository:</strong> ${REPO}</p>
-        <p><strong>Analysis ID:</strong> ${ANALYSIS_ID}</p>
-        <p><strong>Files Analyzed:</strong> ${FILE_COUNT}</p>
-        <p><strong>Issues Found:</strong> ${ISSUE_COUNT}</p>
-    </div>
-    <div class="error">
-        <h2>Dashboard Generation Error</h2>
-        <p>The full interactive dashboard could not be generated. Please check the workflow logs for details.</p>
-        <p>Raw analysis data is available in the workflow artifacts.</p>
-    </div>
-</body>
-</html>
-EOHTML
+          cat > output/dashboard-${ANALYSIS_ID}.html << EOHTML
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>CPPCheck Analysis - ${REPO}</title>
+              <style>
+                  body { font-family: Arial, sans-serif; margin: 20px; }
+                  .header { background: #f0f0f0; padding: 20px; border-radius: 5px; }
+                  .error { color: red; }
+                  .info { color: blue; }
+              </style>
+          </head>
+          <body>
+              <div class="header">
+                  <h1>CPPCheck Analysis Results</h1>
+                  <p><strong>Repository:</strong> ${REPO}</p>
+                  <p><strong>Analysis ID:</strong> ${ANALYSIS_ID}</p>
+                  <p><strong>Files Analyzed:</strong> ${FILE_COUNT}</p>
+                  <p><strong>Issues Found:</strong> ${ISSUE_COUNT}</p>
+              </div>
+              <div class="error">
+                  <h2>Dashboard Generation Error</h2>
+                  <p>The full interactive dashboard could not be generated. Please check the workflow logs for details.</p>
+                  <p>Raw analysis data is available in the workflow artifacts.</p>
+              </div>
+          </body>
+          </html>
+          EOHTML
         fi
         
         # Verify dashboard was created
@@ -531,23 +510,23 @@ EOHTML
         
         # Create gallery-compatible metadata
         cat > output/metadata.json << EOF
-{
-  "analysis_id": "${ANALYSIS_ID}",
-  "repository": "${REPO}",
-  "branch": "${BRANCH}",
-  "commit": "${COMMIT_SHA}",
-  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "filesAnalyzed": ${FILE_COUNT},
-  "files_analyzed": ${FILE_COUNT},
-  "issues": ${ISSUE_BREAKDOWN},
-  "issues_found": ${ISSUE_COUNT},
-  "max_files": ${MAX_FILES_INT},
-  "dashboardUrl": "https://jerryzhao173985.github.io/cppcheck-studio/results/${ANALYSIS_ID}/index.html",
-  "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/${ANALYSIS_ID}/index.html",
-  "dashboard_size": ${DASHBOARD_SIZE},
-  "analysis_size": ${ANALYSIS_SIZE}
-}
-EOF
+        {
+          "analysis_id": "${ANALYSIS_ID}",
+          "repository": "${REPO}",
+          "branch": "${BRANCH}",
+          "commit": "${COMMIT_SHA}",
+          "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "filesAnalyzed": ${FILE_COUNT},
+          "files_analyzed": ${FILE_COUNT},
+          "issues": ${ISSUE_BREAKDOWN},
+          "issues_found": ${ISSUE_COUNT},
+          "max_files": ${MAX_FILES_INT},
+          "dashboardUrl": "https://jerryzhao173985.github.io/cppcheck-studio/results/${ANALYSIS_ID}/index.html",
+          "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/${ANALYSIS_ID}/index.html",
+          "dashboard_size": ${DASHBOARD_SIZE},
+          "analysis_size": ${ANALYSIS_SIZE}
+        }
+        EOF
         
         echo "✅ Dashboard generation complete!"
 
@@ -583,27 +562,27 @@ EOF
         
         # Create final status with full details
         cat > docs/api/status/${ANALYSIS_ID}.json << EOF
-{
-  "analysis_id": "${ANALYSIS_ID}",
-  "repository": "${REPO}",
-  "status": "completed",
-  "step": "completed",
-  "workflow_run_id": "${{ github.run_id }}",
-  "workflow_run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-  "completed_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "files_analyzed": ${FILE_COUNT},
-  "filesAnalyzed": ${FILE_COUNT},
-  "issues_found": ${ISSUE_COUNT},
-  "issues": $(cat ../output/metadata.json | jq -c .issues || echo '{"total":0}'),
-  "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/${ANALYSIS_ID}/index.html",
-  "dashboardUrl": "https://jerryzhao173985.github.io/cppcheck-studio/results/${ANALYSIS_ID}/index.html",
-  "progress": {
-    "steps_completed": 5,
-    "total_steps": 5,
-    "current_step": "completed"
-  }
-}
-EOF
+        {
+          "analysis_id": "${ANALYSIS_ID}",
+          "repository": "${REPO}",
+          "status": "completed",
+          "step": "completed",
+          "workflow_run_id": "${{ github.run_id }}",
+          "workflow_run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+          "completed_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "files_analyzed": ${FILE_COUNT},
+          "filesAnalyzed": ${FILE_COUNT},
+          "issues_found": ${ISSUE_COUNT},
+          "issues": $(cat ../output/metadata.json | jq -c .issues || echo '{"total":0}'),
+          "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/${ANALYSIS_ID}/index.html",
+          "dashboardUrl": "https://jerryzhao173985.github.io/cppcheck-studio/results/${ANALYSIS_ID}/index.html",
+          "progress": {
+            "steps_completed": 5,
+            "total_steps": 5,
+            "current_step": "completed"
+          }
+        }
+        EOF
         
         # Update gallery
         if [ -f docs/api/gallery.json ]; then
