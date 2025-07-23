@@ -192,8 +192,13 @@ gh workflow run scheduled-maintenance.yml \
 ## 🔧 Configuration
 
 ### Secrets Required
-- `NPM_TOKEN` - For publishing to npm (optional)
-- `GITHUB_TOKEN` - Automatically provided
+- `GITHUB_TOKEN` - Automatically provided by GitHub Actions
+- `NPM_TOKEN` - For publishing to npm (optional, only needed if using `05-release.yml`)
+
+### Important Notes
+- Most workflows function without additional secrets
+- NPM_TOKEN is only required for automated npm publishing
+- All other tokens are optional for enhanced features
 
 ### Environment Variables
 - Set in workflow files directly
