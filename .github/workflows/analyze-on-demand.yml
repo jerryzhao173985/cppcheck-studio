@@ -349,23 +349,22 @@ jobs:
         if [ -f "$GITHUB_WORKSPACE/status_updates/current_status.json" ]; then
           cp "$GITHUB_WORKSPACE/status_updates/current_status.json" docs/api/status/${{ env.ANALYSIS_ID }}.json
         else
-          # Fallback status  
-          cat > docs/api/status/${ANALYSIS_ID}.json << EOF
-            {
-              "analysis_id": "${ANALYSIS_ID}",
-              "repository": "${REPO}",
-              "status": "running",
-              "workflow_run_id": "${{ github.run_id }}",
-              "workflow_run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-              "updated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-              "message": "Processing analysis...",
-              "progress": {
-                "steps_completed": 3,
-                "total_steps": 5,
-                "current_step": "processing"
-              }
-            }
-          EOF
+          # Fallback status
+          printf '%s\n' \
+            '{' \
+            '  "analysis_id": "'"${ANALYSIS_ID}"'",' \
+            '  "repository": "'"${REPO}"'",' \
+            '  "status": "running",' \
+            '  "workflow_run_id": "'"${{ github.run_id }}"'",' \
+            '  "workflow_run_url": "'"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"'",' \
+            '  "updated_at": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'",' \
+            '  "message": "Processing analysis...",' \
+            '  "progress": {' \
+            '    "steps_completed": 3,' \
+            '    "total_steps": 5,' \
+            '    "current_step": "processing"' \
+            '  }' \
+            '}' > docs/api/status/${ANALYSIS_ID}.json
         fi
         
         # Commit and push status update
@@ -447,34 +446,33 @@ jobs:
         # Last resort - create minimal dashboard
         if [ "$DASHBOARD_GENERATED" = "false" ]; then
           echo "⚠️ All generators failed, creating minimal dashboard..."
-          cat > output/dashboard-${ANALYSIS_ID}.html << EOHTML
-          <!DOCTYPE html>
-          <html>
-          <head>
-              <title>CPPCheck Analysis - ${REPO}</title>
-              <style>
-                  body { font-family: Arial, sans-serif; margin: 20px; }
-                  .header { background: #f0f0f0; padding: 20px; border-radius: 5px; }
-                  .error { color: red; }
-                  .info { color: blue; }
-              </style>
-          </head>
-          <body>
-              <div class="header">
-                  <h1>CPPCheck Analysis Results</h1>
-                  <p><strong>Repository:</strong> ${REPO}</p>
-                  <p><strong>Analysis ID:</strong> ${ANALYSIS_ID}</p>
-                  <p><strong>Files Analyzed:</strong> ${FILE_COUNT}</p>
-                  <p><strong>Issues Found:</strong> ${ISSUE_COUNT}</p>
-              </div>
-              <div class="error">
-                  <h2>Dashboard Generation Error</h2>
-                  <p>The full interactive dashboard could not be generated. Please check the workflow logs for details.</p>
-                  <p>Raw analysis data is available in the workflow artifacts.</p>
-              </div>
-          </body>
-          </html>
-          EOHTML
+          printf '%s\n' \
+            '<!DOCTYPE html>' \
+            '<html>' \
+            '<head>' \
+            '    <title>CPPCheck Analysis - '"${REPO}"'</title>' \
+            '    <style>' \
+            '        body { font-family: Arial, sans-serif; margin: 20px; }' \
+            '        .header { background: #f0f0f0; padding: 20px; border-radius: 5px; }' \
+            '        .error { color: red; }' \
+            '        .info { color: blue; }' \
+            '    </style>' \
+            '</head>' \
+            '<body>' \
+            '    <div class="header">' \
+            '        <h1>CPPCheck Analysis Results</h1>' \
+            '        <p><strong>Repository:</strong> '"${REPO}"'</p>' \
+            '        <p><strong>Analysis ID:</strong> '"${ANALYSIS_ID}"'</p>' \
+            '        <p><strong>Files Analyzed:</strong> '"${FILE_COUNT}"'</p>' \
+            '        <p><strong>Issues Found:</strong> '"${ISSUE_COUNT}"'</p>' \
+            '    </div>' \
+            '    <div class="error">' \
+            '        <h2>Dashboard Generation Error</h2>' \
+            '        <p>The full interactive dashboard could not be generated. Please check the workflow logs for details.</p>' \
+            '        <p>Raw analysis data is available in the workflow artifacts.</p>' \
+            '    </div>' \
+            '</body>' \
+            '</html>' > output/dashboard-${ANALYSIS_ID}.html
         fi
         
         # Verify dashboard was created
@@ -509,24 +507,35 @@ jobs:
         echo "📊 Issue breakdown: $ISSUE_BREAKDOWN"
         
         # Create gallery-compatible metadata
-        cat > output/metadata.json << EOF
-        {
-          "analysis_id": "${ANALYSIS_ID}",
-          "repository": "${REPO}",
-          "branch": "${BRANCH}",
-          "commit": "${COMMIT_SHA}",
-          "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-          "filesAnalyzed": ${FILE_COUNT},
-          "files_analyzed": ${FILE_COUNT},
-          "issues": ${ISSUE_BREAKDOWN},
-          "issues_found": ${ISSUE_COUNT},
-          "max_files": ${MAX_FILES_INT},
-          "dashboardUrl": "https://jerryzhao173985.github.io/cppcheck-studio/results/${ANALYSIS_ID}/index.html",
-          "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/${ANALYSIS_ID}/index.html",
-          "dashboard_size": ${DASHBOARD_SIZE},
-          "analysis_size": ${ANALYSIS_SIZE}
-        }
-        EOF
+        jq -n \
+          --arg id "${ANALYSIS_ID}" \
+          --arg repo "${REPO}" \
+          --arg branch "${BRANCH}" \
+          --arg commit "${COMMIT_SHA}" \
+          --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+          --argjson files "${FILE_COUNT}" \
+          --argjson issues_json "${ISSUE_BREAKDOWN}" \
+          --argjson issue_count "${ISSUE_COUNT}" \
+          --argjson max_files "${MAX_FILES_INT}" \
+          --arg dashboard_url "https://jerryzhao173985.github.io/cppcheck-studio/results/${ANALYSIS_ID}/index.html" \
+          --argjson dashboard_size "${DASHBOARD_SIZE}" \
+          --argjson analysis_size "${ANALYSIS_SIZE}" \
+          '{
+            analysis_id: $id,
+            repository: $repo,
+            branch: $branch,
+            commit: $commit,
+            timestamp: $timestamp,
+            filesAnalyzed: $files,
+            files_analyzed: $files,
+            issues: $issues_json,
+            issues_found: $issue_count,
+            max_files: $max_files,
+            dashboardUrl: $dashboard_url,
+            dashboard_url: $dashboard_url,
+            dashboard_size: $dashboard_size,
+            analysis_size: $analysis_size
+          }' > output/metadata.json
         
         echo "✅ Dashboard generation complete!"
 
@@ -561,28 +570,39 @@ jobs:
         cp ../output/metadata.json docs/api/analyses/${ANALYSIS_ID}.json
         
         # Create final status with full details
-        cat > docs/api/status/${ANALYSIS_ID}.json << EOF
-        {
-          "analysis_id": "${ANALYSIS_ID}",
-          "repository": "${REPO}",
-          "status": "completed",
-          "step": "completed",
-          "workflow_run_id": "${{ github.run_id }}",
-          "workflow_run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-          "completed_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-          "files_analyzed": ${FILE_COUNT},
-          "filesAnalyzed": ${FILE_COUNT},
-          "issues_found": ${ISSUE_COUNT},
-          "issues": $(cat ../output/metadata.json | jq -c .issues || echo '{"total":0}'),
-          "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/${ANALYSIS_ID}/index.html",
-          "dashboardUrl": "https://jerryzhao173985.github.io/cppcheck-studio/results/${ANALYSIS_ID}/index.html",
-          "progress": {
-            "steps_completed": 5,
-            "total_steps": 5,
-            "current_step": "completed"
-          }
-        }
-        EOF
+        ISSUES_JSON=$(cat ../output/metadata.json | jq -c .issues || echo '{"total":0}')
+        jq -n \
+          --arg id "${ANALYSIS_ID}" \
+          --arg repo "${REPO}" \
+          --arg status "completed" \
+          --arg step "completed" \
+          --arg workflow_run_id "${{ github.run_id }}" \
+          --arg workflow_run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+          --arg completed_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+          --argjson files "${FILE_COUNT}" \
+          --argjson issue_count "${ISSUE_COUNT}" \
+          --argjson issues_obj "${ISSUES_JSON}" \
+          --arg dashboard_url "https://jerryzhao173985.github.io/cppcheck-studio/results/${ANALYSIS_ID}/index.html" \
+          '{
+            analysis_id: $id,
+            repository: $repo,
+            status: $status,
+            step: $step,
+            workflow_run_id: $workflow_run_id,
+            workflow_run_url: $workflow_run_url,
+            completed_at: $completed_at,
+            files_analyzed: $files,
+            filesAnalyzed: $files,
+            issues_found: $issue_count,
+            issues: $issues_obj,
+            dashboard_url: $dashboard_url,
+            dashboardUrl: $dashboard_url,
+            progress: {
+              steps_completed: 5,
+              total_steps: 5,
+              current_step: "completed"
+            }
+          }' > docs/api/status/${ANALYSIS_ID}.json
         
         # Update gallery
         if [ -f docs/api/gallery.json ]; then
@@ -618,58 +638,26 @@ jobs:
         set -euo pipefail
         DASHBOARD_URL="https://jerryzhao173985.github.io/cppcheck-studio/results/${ANALYSIS_ID}/index.html"
         
-        # Create a prominent banner
-        cat >> $GITHUB_STEP_SUMMARY << EOF
-        # 🎯 CPPCheck Analysis Complete!
-        
-        > ### [🔗 **CLICK HERE TO VIEW YOUR INTERACTIVE DASHBOARD** →](${DASHBOARD_URL})
-        > 
-        > The dashboard includes:
-        > - **Virtual scrolling** for smooth navigation through all ${ISSUE_COUNT:-0} issues
-        > - **Code context preview** showing the exact lines where issues occur
-        > - **Real-time search and filtering** by severity, file, or message
-        > - **Detailed issue information** with line numbers and descriptions
-        
-        ---
-        
-        ## 📊 Analysis Summary
-        
-        | Property | Value |
-        |----------|-------|
-        | **Repository** | \`${REPO}\` |
-        | **Branch** | \`${BRANCH}\` |
-        | **Commit** | \`${COMMIT_SHA}\` |
-        | **Analysis ID** | \`${ANALYSIS_ID}\` |
-        | **Files Analyzed** | **${FILE_COUNT:-0}** |
-        | **Total Issues** | **${ISSUE_COUNT:-0}** |
-        
-        ## 📈 Issue Breakdown
-        \`\`\`
-        $(cat output/summary.txt 2>/dev/null || echo "Summary not available")
-        \`\`\`
-        
-        ## 🔗 Additional Links
-        - [📂 Download Analysis Artifacts](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts)
-        - [🔍 View Workflow Logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-        - [📊 API Status Endpoint](https://jerryzhao173985.github.io/cppcheck-studio/api/status/${ANALYSIS_ID}.json)
-        
-        ## 💡 Dashboard Tips
-        1. **Can't see issues?** Press \`F12\` to open console, then run \`recoverDashboard()\`
-        2. **Use keyboard shortcuts**: 
-           - \`/\` to focus search
-           - \`1-5\` to filter by severity
-           - \`ESC\` to close modals
-        3. **Share the dashboard**: The URL is permanent and can be bookmarked
-        
-        ---
-        
-        <details>
-        <summary>📝 Debug Information</summary>
-        
-        - Workflow Run: ${{ github.run_id }}
-        - Triggered by: ${{ github.event_name }}
-        - Runner: ${{ runner.os }}
-        - Analysis completed at: $(date -u +%Y-%m-%dT%H:%M:%SZ)
-        
-        </details>
-        EOF
+        # Create job summary using script
+        bash cppcheck-studio/scripts/create-job-summary.sh \
+          "${DASHBOARD_URL}" \
+          "${REPO}" \
+          "${BRANCH}" \
+          "${COMMIT_SHA}" \
+          "${ANALYSIS_ID}" \
+          "${FILE_COUNT:-0}" \
+          "${ISSUE_COUNT:-0}" | \
+        sed -e "s|DASHBOARD_URL_PLACEHOLDER|${DASHBOARD_URL}|g" \
+            -e "s|REPO_PLACEHOLDER|${REPO}|g" \
+            -e "s|BRANCH_PLACEHOLDER|${BRANCH}|g" \
+            -e "s|COMMIT_PLACEHOLDER|${COMMIT_SHA}|g" \
+            -e "s|ANALYSIS_ID_PLACEHOLDER|${ANALYSIS_ID}|g" \
+            -e "s|FILE_COUNT_PLACEHOLDER|${FILE_COUNT:-0}|g" \
+            -e "s|ISSUE_COUNT_PLACEHOLDER|${ISSUE_COUNT:-0}|g" \
+            -e "s|ARTIFACTS_URL_PLACEHOLDER|${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts|g" \
+            -e "s|WORKFLOW_URL_PLACEHOLDER|${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|g" \
+            -e "s|WORKFLOW_RUN_ID|${{ github.run_id }}|g" \
+            -e "s|EVENT_NAME|${{ github.event_name }}|g" \
+            -e "s|RUNNER_OS|${{ runner.os }}|g" \
+            -e "s|COMPLETED_AT|$(date -u +%Y-%m-%dT%H:%M:%SZ)|g" \
+        >> $GITHUB_STEP_SUMMARY
