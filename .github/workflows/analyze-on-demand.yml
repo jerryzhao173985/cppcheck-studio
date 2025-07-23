@@ -301,6 +301,13 @@ jobs:
         
         cd ..
         
+        # Debug: Show current directory structure
+        echo "📁 Current directory: $(pwd)"
+        echo "📂 Directory contents:"
+        ls -la | head -10
+        echo "📂 Looking for xml2json-simple.py:"
+        find . -name "xml2json-simple.py" -type f 2>/dev/null || echo "Not found"
+        
         # Verify XML output
         echo "📄 Checking cppcheck XML output..."
         if [ ! -f cppcheck-results.xml ]; then

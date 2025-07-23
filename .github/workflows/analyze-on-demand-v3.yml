@@ -103,6 +103,11 @@ jobs:
         
         cd ..
         
+        # Debug: Show current directory
+        echo "📁 Current directory: $(pwd)"
+        echo "📂 Contents:"
+        ls -la
+        
         # Convert to JSON
         python3 cppcheck-studio/xml2json-simple.py cppcheck-results.xml > analysis.json
         
