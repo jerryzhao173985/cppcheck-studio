@@ -1,1 +1,0 @@
-{"id": "nullPointer", "code_context": {"code": ["void test() {", "  int* p = nullptr;", "  *p = 10; // Error here", "}"], "start_line": 9}}

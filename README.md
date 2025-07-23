@@ -1,289 +1,147 @@
 # CPPCheck Studio
 
-<p align="center">
-  <a href="https://jerryzhao173985.github.io/cppcheck-studio/"><img src="https://img.shields.io/badge/GitHub%20Pages-online-success
-  <a href="https://github.com/jerryzhao173985/cppcheck-studio/actions/workflows/deploy-docs.yml"><img src="https://github.com/jerryzhao173985/cppcheck-studio/actions/workflows/deploy-docs.yml/badge.svg" alt="Deploy Status"></a>
-  <img src="https://img.shields.io/badge/version-2.0.0-blue.svg" alt="Version">
-  <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License">
-  <img src="https://img.shields.io/badge/python-%3E%3D3.6-brightgreen.svg" alt="Python">
-  <img src="https://img.shields.io/badge/node-%3E%3D14.0-green.svg" alt="Node">
-  <img src="https://img.shields.io/badge/typescript-5.3-blue.svg" alt="TypeScript">
-</p>
+Transform CPPCheck static analysis results into beautiful, interactive HTML dashboards.
 
-<p align="center">
-  <b>Transform CPPCheck static analysis into beautiful, interactive dashboards</b>
-</p>
+## Features
 
-## 🌟 Overview
+- **Virtual Scrolling** - Handle 100,000+ issues smoothly
+- **Interactive Filtering** - Real-time search and severity filters
+- **Code Context** - Preview issues with surrounding code
+- **Standalone HTML** - No server required, works offline
+- **Zero Dependencies** - Python version needs no packages
+- **Unified CLI** - Simple command-line interface for all operations
 
-CPPCheck Studio provides **two complete, production-ready implementations** for visualizing C++ static analysis results:
+## Quick Start
 
-### 1. TypeScript/Node.js Package ✅
-Modern npm package with full TypeScript support, CLI interface, and programmatic API.
-
-### 2. Python Scripts Collection ✅
-Battle-tested generators with multiple dashboard styles and zero dependencies.
-
-Both create identical, stunning dashboards featuring:
-- **🚀 Virtual Scrolling** - Smoothly handle 100,000+ issues
-- **📊 Interactive Statistics** - Visual severity breakdown
-- **🔍 Real-time Search** - Instant filtering
-- **📝 Code Preview** - See issues in context
-- **📦 Standalone HTML** - Works offline, no server needed
-
-## 🚀 Quick Start
-
-### TypeScript/Node.js Version
+### Instant Setup
 
 ```bash
-# Clone and build
-git clone <repository>
-cd cppcheck-studio/cppcheck-dashboard-generator
+# Run the interactive quick start
+python3 quickstart.py
+```
+
+This will guide you through analyzing your code and generating your first dashboard.
+
+### Manual Setup
+
+#### Option 1: Unified CLI (Recommended)
+
+```bash
+# Show available commands
+python3 cppcheck-studio.py --help
+
+# Analyze and generate dashboard
+python3 cppcheck-studio.py analyze analysis.json
+
+# Add code context first
+python3 cppcheck-studio.py add-context analysis.json
+python3 cppcheck-studio.py analyze analysis-with-context.json
+
+# Show statistics
+python3 cppcheck-studio.py stats analysis.json
+```
+
+#### Option 2: Direct Python Scripts
+
+```bash
+# Add code context
+python3 add-code-context.py analysis.json
+
+# Generate dashboard (virtual scrolling)
+python3 generate/generate-standalone-virtual-dashboard.py analysis-with-context.json dashboard.html
+
+# Generate minimal dashboard
+python3 generate/generate-production-dashboard.py analysis.json minimal.html
+```
+
+#### Option 3: TypeScript/Node.js
+
+```bash
+# Build the package
+cd cppcheck-dashboard-generator
 npm install && npm run build
 
 # Generate dashboard
-node dist/cli.js analysis.json dashboard.html
-
-# Or install globally
-npm link
-cppcheck-dashboard analysis.json dashboard.html
+node dist/cli.js ../analysis.json ../dashboard.html
 ```
 
-### Python Version
+## Running CPPCheck
 
-```bash
-# No installation needed! Just run:
-python3 generate/generate-standalone-virtual-dashboard.py analysis.json dashboard.html
-```
+First, analyze your C++ code with CPPCheck:
 
-## 📊 Real World Results
-
-Successfully tested on the LPZRobots C++ codebase:
-- **2,975 issues** analyzed and visualized
-- **2,837 issues** with full code context
-- **< 1 second** load time
-- **3MB** standalone HTML file
-
-## 🎯 Which Version Should I Use?
-
-### Use TypeScript Version If You:
-- Want npm package management
-- Need TypeScript type safety
-- Plan to integrate programmatically
-- Prefer modern JavaScript tooling
-
-### Use Python Version If You:
-- Want zero setup/dependencies
-- Need multiple dashboard styles
-- Prefer proven, stable solution
-- Work in Python ecosystem
-
-## 📖 Complete Usage Guide
-
-### Step 1: Run CPPCheck Analysis
 ```bash
 # Basic analysis
 cppcheck --enable=all src/ --output-file=analysis.json
 
-# With more details (recommended)
+# Recommended: with more details
 cppcheck --enable=all --std=c++17 --suppress=missingInclude \
          --output-file=analysis.json --template=gcc src/
 ```
 
-### Step 2: Add Code Context (Optional but Recommended)
-```bash
-# This adds the actual code snippets around each issue
-python3 add-code-context.py analysis.json analysis-with-context.json
-```
+## CLI Commands
 
-### Step 3: Generate Dashboard
+The unified CLI (`cppcheck-studio.py`) provides these commands:
 
-**TypeScript Version:**
-```bash
-cppcheck-dashboard analysis-with-context.json my-dashboard.html \
-  --title "My Project Analysis" \
-  --project "MyProject v1.0"
-```
+- **analyze** - Generate dashboard from analysis JSON
+  - `--virtual` - Use virtual scrolling for large datasets
+  - `--minimal` - Generate minimal dashboard without code
+  - `--force` - Overwrite existing output
+  
+- **add-context** - Add code context to analysis
+  - `--lines N` - Context lines before/after (default: 5)
+  
+- **stats** - Show analysis statistics
+- **validate** - Validate JSON format
 
-**Python Version:**
-```bash
-# Virtual scroll (best for large datasets)
-python3 generate/generate-standalone-virtual-dashboard.py \
-  analysis-with-context.json my-dashboard.html
+## Available Generators
 
-# Ultimate dashboard (recommended for <5000 issues)
-python3 generate/generate-ultimate-dashboard.py \
-  analysis-with-context.json my-dashboard.html
-```
-
-### Step 4: View Results
-```bash
-# Open in default browser
-open my-dashboard.html  # macOS
-xdg-open my-dashboard.html  # Linux
-start my-dashboard.html  # Windows
-```
-
-## 🎨 Dashboard Features
-
-### Interactive Elements
-- **Search Bar** - Filter issues in real-time
-- **Severity Filters** - One-click filtering by type
-- **Statistics Cards** - Visual issue breakdown
-- **Virtual Table** - Smooth scrolling through thousands of rows
-- **Code Preview** - Click to see issue in context
-
-### Example Statistics
-```
-┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
-│   ERRORS    │ │  WARNINGS   │ │   STYLE     │ │ PERFORMANCE │
-│    772      │ │    153      │ │   1,932     │ │     31      │
-│  (25.9%)    │ │   (5.1%)    │ │  (64.9%)    │ │   (1.0%)   │
-└─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘
-```
-
-## 🛠️ Installation
+### Python Scripts
+- `generate-standalone-virtual-dashboard.py` - Best for large datasets (virtual scrolling)
+- `generate-ultimate-dashboard.py` - Feature-rich for <5000 issues
+- `generate-production-dashboard.py` - Minimal size, no code context
 
 ### TypeScript Package
+- Full CLI with options (`--title`, `--project`, etc.)
+- Programmatic API for integration
+- TypeScript type safety
 
+## Real-World Performance
+
+Tested on LPZRobots C++ codebase:
+- 2,975 issues analyzed
+- < 1 second load time
+- 3MB standalone HTML file
+
+## Requirements
+
+- **Python version**: Python 3.6+
+- **TypeScript version**: Node.js 14+
+- **CPPCheck**: Latest version recommended
+
+## Installation
+
+### Python (No installation needed!)
 ```bash
-# From source
+git clone <repository>
+cd cppcheck-studio
+python3 cppcheck-studio.py --help
+```
+
+### TypeScript/Node.js
+```bash
 cd cppcheck-dashboard-generator
 npm install
 npm run build
-npm link  # Makes 'cppcheck-dashboard' command available
-
-# For development
-npm run dev  # Watch mode
+npm link  # Optional: install globally
 ```
 
-### Python Scripts
+## Contributing
 
-No installation required! Just ensure Python 3.6+ is installed:
-```bash
-python3 --version  # Should be 3.6+
-```
+Contributions are welcome! The codebase is clean and well-documented:
+- Python scripts have type hints and docstrings
+- TypeScript code is fully typed
+- Both implementations create identical output
 
-## 📁 Project Structure
+## License
 
-```
-cppcheck-studio/
-├── cppcheck-dashboard-generator/    # TypeScript npm package
-│   ├── src/                        # Source files
-│   ├── dist/                       # Compiled output
-│   └── bin/                        # CLI executable
-│
-├── generate/                       # Python generators
-│   ├── generate-standalone-virtual-dashboard.py
-│   ├── generate-ultimate-dashboard.py
-│   └── ...                        # Other variants
-│
-├── data/                          # Sample data
-│   └── analysis-with-context.json # LPZRobots analysis
-│
-└── docs/                          # Documentation
-```
-
-## 🧪 Advanced Usage
-
-### Programmatic API (TypeScript)
-
-```typescript
-import { StandaloneVirtualDashboardGenerator } from 'cppcheck-dashboard-generator';
-
-const generator = new StandaloneVirtualDashboardGenerator({
-  input: 'analysis.json',
-  output: 'dashboard.html',
-  title: 'My Custom Analysis',
-  projectName: 'MyProject'
-});
-
-await generator.generate();
-```
-
-### Python Dashboard Types
-
-1. **standalone-virtual** - Best for 5,000+ issues
-2. **ultimate** - Best for <5,000 issues  
-3. **production** - Minimal size, no code
-4. **robust** - Enhanced error handling
-5. **split** - Separate data files
-
-## 🚨 Troubleshooting
-
-### Common Issues
-
-**No data showing in dashboard**
-- Check JSON format is valid
-- Ensure file paths are correct
-- Look for errors in browser console
-
-**Performance issues**
-- Use virtual scroll version for large datasets
-- Check available browser memory
-- Try production dashboard for minimal size
-
-**Code context missing**
-- Run `add-code-context.py` first
-- Ensure source files are accessible
-- Check file paths in JSON
-
-## 🔗 Integration Examples
-
-### CI/CD Pipeline
-```yaml
-# GitHub Actions example
-- name: Run CPPCheck
-  run: cppcheck --enable=all src/ --output-file=analysis.json
-
-- name: Generate Dashboard
-  run: |
-    npm install -g cppcheck-dashboard-generator
-    cppcheck-dashboard analysis.json dashboard.html
-
-- name: Upload Dashboard
-  uses: actions/upload-artifact@v3
-  with:
-    name: cppcheck-dashboard
-    path: dashboard.html
-```
-
-### Pre-commit Hook
-```bash
-#!/bin/bash
-# .git/hooks/pre-commit
-cppcheck --enable=all src/ --output-file=.cppcheck.json
-python3 generate/generate-production-dashboard.py .cppcheck.json .cppcheck.html
-echo "CPPCheck dashboard generated: .cppcheck.html"
-```
-
-## 📈 Performance Benchmarks
-
-| Issues Count | File Size | Load Time | Scroll Performance |
-|-------------|-----------|-----------|-------------------|
-| 100         | 50 KB     | <0.1s     | 60 FPS           |
-| 1,000       | 500 KB    | <0.5s     | 60 FPS           |
-| 10,000      | 5 MB      | <1s       | 60 FPS           |
-| 100,000     | 50 MB     | <3s       | 55-60 FPS        |
-
-## 🤝 Contributing
-
-We welcome contributions! Please:
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new features
-4. Submit a pull request
-
-## 📄 License
-
-MIT License - see LICENSE file for details.
-
-## 🙏 Acknowledgments
-
-- Tested extensively on the LPZRobots project
-- Virtual scrolling inspired by modern web best practices
-- Built with love for the C++ community
-
----
-
-**Note**: The directories `apps/` and `packages/` contain incomplete monorepo scaffolding and should not be used. Use `cppcheck-dashboard-generator/` for TypeScript or `generate/` for Python.
+MIT License - see LICENSE file for details

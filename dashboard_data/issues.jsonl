@@ -1,3 +1,0 @@
-{"file": "/sample/code.cpp", "line": 10, "severity": "error", "message": "Null pointer dereference", "id": "nullPointer"}
-{"file": "/sample/code.cpp", "line": 20, "severity": "warning", "message": "Member variable not initialized", "id": "uninitMemberVar"}
-{"file": "/sample/code.cpp", "line": 30, "severity": "style", "message": "Use nullptr instead of NULL", "id": "useNullptr"}
