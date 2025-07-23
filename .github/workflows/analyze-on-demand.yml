@@ -332,10 +332,12 @@ jobs:
         echo "📂 Looking for xml2json-simple.py in various locations:"
         find . -name "xml2json-simple.py" -type f | head -5
         
-        # The script should be at cppcheck-studio/xml2json-simple.py relative to current directory
-        if [ -f "cppcheck-studio/xml2json-simple.py" ]; then
-          echo "✅ Found script at: cppcheck-studio/xml2json-simple.py"
-          python3 cppcheck-studio/xml2json-simple.py cppcheck-results.xml > analysis.json
+        # Find the actual location of the script
+        SCRIPT_LOCATION=$(find . -name "xml2json-simple.py" -type f | head -1)
+        
+        if [ -n "$SCRIPT_LOCATION" ]; then
+          echo "✅ Found script at: $SCRIPT_LOCATION"
+          python3 "$SCRIPT_LOCATION" cppcheck-results.xml > analysis.json
         elif [ -f "$GITHUB_WORKSPACE/xml2json-simple.py" ]; then
           echo "✅ Found script at: $GITHUB_WORKSPACE/xml2json-simple.py"
           python3 "$GITHUB_WORKSPACE/xml2json-simple.py" cppcheck-results.xml > analysis.json
@@ -345,6 +347,8 @@ jobs:
           ls -la
           echo "📂 Contents of cppcheck-studio:"
           ls -la cppcheck-studio/ | head -20
+          echo "📂 Contents of cppcheck-studio/cppcheck-studio:"
+          ls -la cppcheck-studio/cppcheck-studio/ | head -20
           exit 1
         fi
         
