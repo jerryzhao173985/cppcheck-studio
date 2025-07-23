@@ -459,6 +459,19 @@
                 );
             }
             
+            // Apply sorting to repos
+            switch (currentSort) {
+                case 'recent':
+                    filteredRepos.sort((a, b) => new Date(b.analyses[0].timestamp) - new Date(a.analyses[0].timestamp));
+                    break;
+                case 'issues':
+                    filteredRepos.sort((a, b) => b.latestIssues - a.latestIssues);
+                    break;
+                case 'name':
+                    filteredRepos.sort((a, b) => a.name.localeCompare(b.name));
+                    break;
+            }
+            
             repoView.innerHTML = `
                 <style>
                     .repo-card {
@@ -589,10 +602,33 @@
             card.classList.toggle('expanded');
         }
         
+        function applySorting(analyses) {
+            const sorted = [...analyses];
+            
+            switch (currentSort) {
+                case 'recent':
+                    sorted.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                    break;
+                case 'issues':
+                    sorted.sort((a, b) => {
+                        const aIssues = a.issues_found || (a.issues ? a.issues.total : 0);
+                        const bIssues = b.issues_found || (b.issues ? b.issues.total : 0);
+                        return bIssues - aIssues;
+                    });
+                    break;
+                case 'name':
+                    sorted.sort((a, b) => a.repository.localeCompare(b.repository));
+                    break;
+            }
+            
+            return sorted;
+        }
+        
         function renderGallery(analyses) {
             const grid = document.getElementById('galleryGrid');
+            const sortedAnalyses = applySorting(analyses);
             
-            if (analyses.length === 0) {
+            if (sortedAnalyses.length === 0) {
                 grid.innerHTML = `
                     <div class="empty-state" style="grid-column: 1 / -1;">
                         <h2>No analyses found</h2>
@@ -602,7 +638,7 @@
                 return;
             }
             
-            grid.innerHTML = analyses.map(analysis => {
+            grid.innerHTML = sortedAnalyses.map(analysis => {
                 const maxIssues = Math.max(
                     analysis.issues.error,
                     analysis.issues.warning,
@@ -692,6 +728,21 @@
                 btn.classList.remove('active');
             });
             event.target.classList.add('active');
+            
+            applyFilters();
+        }
+        
+        function sortBy(method) {
+            currentSort = method;
+            
+            // Update active button
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                if (btn.id === `sort${method.charAt(0).toUpperCase() + method.slice(1)}`) {
+                    btn.classList.add('active');
+                } else if (btn.id && btn.id.startsWith('sort')) {
+                    btn.classList.remove('active');
+                }
+            });
             
             applyFilters();
         }
