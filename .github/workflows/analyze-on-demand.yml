@@ -157,7 +157,16 @@ jobs:
         fi
         
         echo "📌 Branch: $BRANCH"
-        MAX_FILES=$(echo "${{ env.MAX_FILES }}" | cut -d. -f1)
+        # Handle empty or invalid MAX_FILES
+        if [ -z "${{ env.MAX_FILES }}" ]; then
+          MAX_FILES=500
+        else
+          MAX_FILES=$(echo "${{ env.MAX_FILES }}" | cut -d. -f1)
+        fi
+        # Ensure MAX_FILES is a valid number
+        if ! [[ "$MAX_FILES" =~ ^[0-9]+$ ]]; then
+          MAX_FILES=500
+        fi
         echo "MAX_FILES_INT=$MAX_FILES" >> $GITHUB_ENV
         echo "📄 Max files: $MAX_FILES"
         
@@ -188,20 +197,34 @@ jobs:
         
         # Find C++ files
         echo "🔎 Searching for C++ files..."
+        echo "📁 Current directory contents:"
+        ls -la | head -10
+        
+        # Use find with error handling
         find . -type f \( -name "*.cpp" -o -name "*.cc" -o -name "*.cxx" -o -name "*.c" -o -name "*.h" -o -name "*.hpp" \) \
           -not -path "*/build/*" \
           -not -path "*/.git/*" \
           -not -path "*/vendor/*" \
           -not -path "*/third_party/*" \
-          | head -n $MAX_FILES > cpp_files.txt
+          2>/dev/null | head -n $MAX_FILES > cpp_files.txt || true
         
-        FILE_COUNT=$(wc -l < cpp_files.txt)
+        FILE_COUNT=$(wc -l < cpp_files.txt | tr -d ' ')
         echo "FILE_COUNT=${FILE_COUNT}" >> $GITHUB_ENV
         
         if [ ${FILE_COUNT} -eq 0 ]; then
           echo "❌ No C++ files found in repository"
-          echo "📝 Files searched:"
+          echo "📝 Repository structure:"
+          find . -type f -name "*.*" | grep -E "\.(cpp|cc|cxx|c|h|hpp)$" | head -20 || echo "No C++ files found"
+          echo ""
+          echo "📂 All files in repository (first 20):"
           find . -type f | head -20
+          echo ""
+          echo "ℹ️ Make sure the repository contains C++ source files with extensions: .cpp, .cc, .cxx, .c, .h, .hpp"
+          echo "ℹ️ Excluded paths: */build/*, */.git/*, */vendor/*, */third_party/*"
+          
+          # Update status before exiting
+          STEPS_COMPLETED=2
+          update_analysis_status "failed" "No C++ files found in repository" "failed"
           exit 1
         fi
         
