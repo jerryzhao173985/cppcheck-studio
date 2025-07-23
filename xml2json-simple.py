@@ -110,13 +110,23 @@ def parse_cppcheck_xml(xml_file):
     return {"issues": issues, "metadata": metadata}
 
 def main():
+    print(f"Debug: Script called with {len(sys.argv)} arguments: {sys.argv}", file=sys.stderr)
+    print(f"Debug: Current working directory: {Path.cwd()}", file=sys.stderr)
+    
     if len(sys.argv) != 2:
         print("Usage: python3 xml2json-simple.py <cppcheck-results.xml>", file=sys.stderr)
+        print(f"Error: Expected 2 arguments, got {len(sys.argv)}", file=sys.stderr)
         sys.exit(1)
     
     xml_file = sys.argv[1]
+    print(f"Debug: Looking for file: '{xml_file}'", file=sys.stderr)
+    print(f"Debug: File exists: {Path(xml_file).exists()}", file=sys.stderr)
+    
     if not Path(xml_file).exists():
         print(f"Error: File '{xml_file}' not found", file=sys.stderr)
+        print(f"Debug: Files in current directory:", file=sys.stderr)
+        for f in Path.cwd().glob("*.xml"):
+            print(f"  - {f.name}", file=sys.stderr)
         sys.exit(1)
     
     # Parse and convert
