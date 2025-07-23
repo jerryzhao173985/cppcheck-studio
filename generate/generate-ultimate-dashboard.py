@@ -4,6 +4,7 @@ Generate the ULTIMATE CPPCheck Dashboard with all features working
 """
 
 import json
+import sys
 import base64
 from pathlib import Path
 from datetime import datetime
@@ -11,8 +12,23 @@ import html
 
 class UltimateDashboardGenerator:
     def __init__(self, issues_file):
-        with open(issues_file) as f:
-            data = json.load(f)
+        try:
+            with open(issues_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        except FileNotFoundError:
+            print(f"Error: File not found: {issues_file}")
+            sys.exit(1)
+        except json.JSONDecodeError as e:
+            print(f"Error: Invalid JSON in {issues_file}: {e}")
+            sys.exit(1)
+        except Exception as e:
+            print(f"Error reading file {issues_file}: {e}")
+            sys.exit(1)
+            
+        if not isinstance(data, dict):
+            print(f"Error: Expected JSON object, got {type(data).__name__}")
+            sys.exit(1)
+            
         self.issues = data.get('issues', [])
         self.timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         

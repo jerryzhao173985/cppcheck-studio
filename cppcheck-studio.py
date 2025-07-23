@@ -93,7 +93,15 @@ def analyze_issues(data: Dict) -> Dict[str, int]:
 def run_generator(generator_script: str, input_file: str, output_file: str) -> bool:
     """Run a Python generator script"""
     try:
-        cmd = [sys.executable, generator_script, input_file, output_file]
+        # Get the directory where this script is located
+        script_dir = Path(__file__).parent
+        generator_path = script_dir / generator_script
+        
+        if not generator_path.exists():
+            print_color(f"Error: Generator not found: {generator_path}", Colors.RED)
+            return False
+            
+        cmd = [sys.executable, str(generator_path), input_file, output_file]
         result = subprocess.run(cmd, capture_output=True, text=True)
         
         if result.returncode != 0:
@@ -191,7 +199,7 @@ For more information, visit: https://github.com/yourusername/cppcheck-studio
         print_color(f"Adding code context to {Path(args.input).name}...", Colors.BLUE)
         
         # Run add-code-context.py
-        if run_generator('./add-code-context.py', args.input, output_file):
+        if run_generator('add-code-context.py', args.input, output_file):
             print_color(f"✓ Code context added successfully!", Colors.GREEN)
             print_color(f"  Output: {output_file}", Colors.GREEN)
         else:
@@ -215,13 +223,13 @@ For more information, visit: https://github.com/yourusername/cppcheck-studio
             
         # Select appropriate generator
         if args.minimal:
-            generator = './generate/generate-production-dashboard.py'
+            generator = 'generate/generate-production-dashboard.py'
             generator_name = 'Minimal Dashboard'
         elif args.virtual or stats['total'] > 5000:
-            generator = './generate/generate-standalone-virtual-dashboard.py'
+            generator = 'generate/generate-standalone-virtual-dashboard.py'
             generator_name = 'Virtual Scroll Dashboard'
         else:
-            generator = './generate/generate-ultimate-dashboard.py'
+            generator = 'generate/generate-ultimate-dashboard.py'
             generator_name = 'Ultimate Dashboard'
             
         print_color(f"\n📈 Generating {generator_name}", Colors.BOLD)

@@ -151,7 +151,7 @@ After installing, run this script again.
         elif sys.platform == 'linux':
             subprocess.run(['xdg-open', dashboard_file])
         elif sys.platform == 'win32':
-            subprocess.run(['start', dashboard_file], shell=True)
+            os.startfile(dashboard_file)
             
         print("""
 Next steps:
