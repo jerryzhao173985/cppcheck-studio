@@ -1,0 +1,17 @@
+{
+  "analysis_id": "1753299553-31167",
+  "repository": "jerryzhao173985/lpz",
+  "status": "running",
+  "step": "processing",
+  "workflow_run_id": "16480203971",
+  "workflow_run_url": "https://github.com/jerryzhao173985/cppcheck-studio/actions/runs/16480203971",
+  "updated_at": "2025-07-23T19:41:46Z",
+  "message": "Analysis complete: found 319 issues in 200 files",
+  "progress": {
+    "steps_completed": 3,
+    "total_steps": 5,
+    "current_step": "processing",
+    "files_found": 200,
+    "issues_found": 319
+  }
+}
