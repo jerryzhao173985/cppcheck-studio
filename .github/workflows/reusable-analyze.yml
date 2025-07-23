@@ -211,19 +211,27 @@ jobs:
     
     - name: Generate dashboard
       run: |
-        # Try simple generator first (no JSONL issues)
-        if [ -f cppcheck-studio/generate/generate-simple-dashboard.py ]; then
-          python3 cppcheck-studio/generate/generate-simple-dashboard.py \
+        # Use the virtual scrolling dashboard (best implementation with all features)
+        if [ -f cppcheck-studio/generate/generate-standalone-virtual-dashboard.py ]; then
+          echo "Using virtual scrolling dashboard generator (recommended)..."
+          python3 cppcheck-studio/generate/generate-standalone-virtual-dashboard.py \
+            analysis-with-context.json \
+            dashboard.html
+        elif [ -f cppcheck-studio/generate/generate-ultimate-dashboard.py ]; then
+          echo "Using ultimate dashboard generator..."
+          python3 cppcheck-studio/generate/generate-ultimate-dashboard.py \
             analysis-with-context.json \
             dashboard.html
         elif command -v cppcheck-dashboard &> /dev/null; then
+          echo "Using TypeScript dashboard generator..."
           cppcheck-dashboard \
             analysis-with-context.json \
             dashboard.html \
             --title "${{ inputs.repository }} Analysis" \
             --project "${{ inputs.repository }} (${{ steps.clone.outputs.commit_sha }})"
         else
-          python3 cppcheck-studio/generate/generate-standalone-virtual-dashboard.py \
+          echo "Using simple dashboard generator (fallback)..."
+          python3 cppcheck-studio/generate/generate-simple-dashboard.py \
             analysis-with-context.json \
             dashboard.html
         fi
