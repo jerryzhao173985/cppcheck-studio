@@ -26,7 +26,9 @@ cppcheck-studio/
 │   ├── generate-standalone-virtual-dashboard.py  # ⭐ RECOMMENDED - All features
 │   ├── generate-production-dashboard.py         # Minimal size, fast
 │   ├── generate-virtual-scroll-dashboard.py     # For huge datasets (100k+ issues)  
-│   └── generate-split-dashboard.py              # Splits data into multiple files
+│   ├── generate-split-dashboard.py              # Splits data into multiple files
+│   ├── generate-optimized-dashboard.py          # Used by GitHub Actions workflow
+│   └── generate-simple-dashboard.py             # Fallback for GitHub Actions
 │
 ├── cppcheck-dashboard-generator/  # TypeScript/npm package (same features)
 │   └── Full npm package with TypeScript implementation
@@ -34,6 +36,12 @@ cppcheck-studio/
 ├── utils/                         # Helper utilities
 │   ├── xml2json-simple.py        # Convert CPPCheck XML to JSON
 │   └── add-code-context.py       # Add code snippets to issues
+│
+├── scripts/                       # Workflow support scripts
+│   ├── generate-summary.py       # Generate issue summary
+│   ├── generate-detailed-report.py # Generate detailed report
+│   ├── extract-issue-breakdown.py  # Extract issue statistics
+│   └── create-job-summary.sh     # Create GitHub job summary
 │
 ├── examples/                      # Sample data and scripts
 │   └── quickstart.sh             # Example workflow

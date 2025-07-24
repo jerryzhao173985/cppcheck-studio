@@ -8,7 +8,9 @@ To simplify CPPCheck Studio and improve maintainability, we are consolidating fr
 
 ### Core Generators (Recommended)
 
-These 4 generators will be actively maintained:
+These generators are actively maintained:
+
+**Note**: `generate-optimized-dashboard.py` and `generate-simple-dashboard.py` have been restored for GitHub Actions workflow compatibility.
 
 1. **`generate-standalone-virtual-dashboard.py`** ✅
    - **Default choice for most users**
