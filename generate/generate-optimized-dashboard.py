@@ -219,6 +219,7 @@ class OptimizedDashboardGenerator:
             color: var(--text-primary);
             line-height: 1.6;
             transition: background-color 0.3s, color 0.3s;
+            font-size: 16px;
         }}
         
         /* Header */
@@ -264,7 +265,7 @@ class OptimizedDashboardGenerator:
             gap: 0.25rem;
             padding: 0.25rem 0.75rem;
             border-radius: 1rem;
-            font-size: 0.875em;
+            font-size: 0.85em;
             font-weight: 500;
             cursor: pointer;
             transition: transform 0.2s;
@@ -336,7 +337,7 @@ class OptimizedDashboardGenerator:
             border-radius: 0.5rem;
             background: var(--bg-primary);
             color: var(--text-primary);
-            font-size: 0.875em;
+            font-size: 0.85em;
         }}
         
         .search-input:focus {{
@@ -365,7 +366,7 @@ class OptimizedDashboardGenerator:
             border-radius: 0.5rem;
             background: var(--bg-primary);
             color: var(--text-primary);
-            font-size: 0.875em;
+            font-size: 0.85em;
             cursor: pointer;
             transition: all 0.2s;
         }}
@@ -401,7 +402,7 @@ class OptimizedDashboardGenerator:
             display: flex;
             justify-content: space-between;
             margin-bottom: 0.5rem;
-            font-size: 0.875em;
+            font-size: 0.85em;
         }}
         
         .progress-bar {{
@@ -454,7 +455,7 @@ class OptimizedDashboardGenerator:
         .file-name {{
             font-weight: 500;
             font-family: var(--font-mono);
-            font-size: 0.875em;
+            font-size: 0.85em;
         }}
         
         .issue-count {{
@@ -532,7 +533,7 @@ class OptimizedDashboardGenerator:
         }}
         
         .issue-message {{
-            font-size: 0.875em;
+            font-size: 0.85em;
             margin-bottom: 0.25rem;
         }}
         
@@ -686,7 +687,7 @@ class OptimizedDashboardGenerator:
             border-radius: 0.5rem;
             overflow: hidden;
             font-family: var(--font-mono);
-            font-size: 0.875em;
+            font-size: 0.85em;
         }}
         
         .code-line {{
@@ -777,9 +778,17 @@ class OptimizedDashboardGenerator:
         
         /* Responsive */
         @media (max-width: 768px) {{
+            body {{
+                font-size: 14px;
+            }}
+            
             .header-content {{
                 flex-direction: column;
                 align-items: stretch;
+            }}
+            
+            .stats-bar {{
+                font-size: 0.85em;
             }}
             
             .controls-content {{
@@ -796,8 +805,14 @@ class OptimizedDashboardGenerator:
                 gap: 0.5rem;
             }}
             
+            .file-info h3 {{
+                font-size: 0.85em;
+            }}
+            
             .issue-item {{
                 flex-direction: column;
+                font-size: 0.85em;
+                padding: 0.75rem;
             }}
             
             .modal-content {{
@@ -823,10 +838,10 @@ class OptimizedDashboardGenerator:
                     <span>Code Analysis Dashboard</span>
                 </h1>
                 <div style="display: flex; gap: 1rem; align-items: center;">
-                    <a href="../../gallery.html" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.1); border-radius: 0.5rem; color: var(--text-primary); text-decoration: none; font-size: 0.875em; transition: all 0.2s;">
+                    <a href="../../gallery.html" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.1); border-radius: 0.5rem; color: var(--text-primary); text-decoration: none; font-size: 0.85em; transition: all 0.2s;">
                         ← Back to Gallery
                     </a>
-                    <a href="../../index.html" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.1); border-radius: 0.5rem; color: var(--text-primary); text-decoration: none; font-size: 0.875em; transition: all 0.2s;">
+                    <a href="../../index.html" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.1); border-radius: 0.5rem; color: var(--text-primary); text-decoration: none; font-size: 0.85em; transition: all 0.2s;">
                         🏠 Home
                     </a>
                 </div>

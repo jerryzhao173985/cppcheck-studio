@@ -477,6 +477,7 @@ class SimpleDashboardGenerator:
             background: #f8f9fa;
             color: #2c3e50;
             line-height: 1.6;
+            font-size: 16px;
         }
         
         .container {
@@ -593,7 +594,7 @@ class SimpleDashboardGenerator:
             padding: 12px 15px 12px 45px;
             border: 1px solid #ddd;
             border-radius: 8px;
-            font-size: 0.875em;
+            font-size: 0.85em;
             transition: border-color 0.2s;
         }
         
@@ -615,7 +616,7 @@ class SimpleDashboardGenerator:
             border-radius: 8px;
             cursor: pointer;
             transition: all 0.2s;
-            font-size: 0.875em;
+            font-size: 0.85em;
             font-weight: 500;
         }
         
@@ -642,7 +643,7 @@ class SimpleDashboardGenerator:
             padding: 10px 0;
             margin-bottom: 10px;
             color: #7f8c8d;
-            font-size: 0.875em;
+            font-size: 0.85em;
         }
         
         /* Table */
@@ -685,7 +686,7 @@ class SimpleDashboardGenerator:
         
         .issue-row td {
             padding: 15px;
-            font-size: 0.875em;
+            font-size: 0.85em;
         }
         
         .indicator-cell {
@@ -861,7 +862,7 @@ class SimpleDashboardGenerator:
             border-radius: 8px;
             margin-bottom: 30px;
             font-family: 'Monaco', 'Consolas', monospace;
-            font-size: 0.875em;
+            font-size: 0.85em;
         }
         
         .code-preview {
@@ -871,7 +872,7 @@ class SimpleDashboardGenerator:
             border-radius: 8px;
             overflow-x: auto;
             font-family: 'Monaco', 'Consolas', monospace;
-            font-size: 13px;
+            font-size: 0.8125em;
             line-height: 1.5;
         }
         
@@ -881,6 +882,39 @@ class SimpleDashboardGenerator:
             margin: 0 -20px;
             padding: 0 20px;
             border-left: 3px solid #667eea;
+        }
+        
+        /* Responsive design */
+        @media (max-width: 768px) {
+            body {
+                font-size: 14px;
+            }
+            
+            .header h1 {
+                font-size: 1.5em;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+            
+            .stat-card .value {
+                font-size: 1.5em;
+            }
+            
+            .issues-table th, .issue-row td {
+                font-size: 0.85em;
+                padding: 10px;
+            }
+            
+            .filter-buttons {
+                flex-direction: column;
+                width: 100%;
+            }
+            
+            .filter-btn {
+                width: 100%;
+            }
         }
         """
 
