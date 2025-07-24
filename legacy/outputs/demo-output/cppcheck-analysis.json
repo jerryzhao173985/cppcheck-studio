@@ -1,0 +1,7 @@
+{"file":"demo-output/sample-code/test.cpp","line":2,"severity":"information","id":"missingIncludeSystem","message":"Include file: <iostream> not found. Please note: Cppcheck does not need standard library headers to get proper results."}
+{"file":"demo-output/sample-code/test.cpp","line":3,"severity":"information","id":"missingIncludeSystem","message":"Include file: <vector> not found. Please note: Cppcheck does not need standard library headers to get proper results."}
+{"file":"demo-output/sample-code/test.cpp","line":11,"severity":"warning","id":"uninitMemberVar","message":"Member variable 'TestClass::size' is not initialized in the constructor."}
+{"file":"demo-output/sample-code/test.cpp","line":34,"severity":"style","id":"missingOverride","message":"The function 'virtualFunc' overrides a function in a base class but is not marked with a 'override' specifier."}
+{"file":"demo-output/sample-code/test.cpp","line":22,"severity":"style","id":"knownConditionTrueFalse","message":"Condition 'i<v.size()' is always false"}
+{"file":"demo-output/sample-code/test.cpp","line":34,"severity":"style","id":"unusedFunction","message":"The function 'virtualFunc' is never used."}
+{"file":"nofile","line":0,"severity":"information","id":"checkersReport","message":"Active checkers: 167/856 (use --checkers-report=<filename> to see details)"}

@@ -1,0 +1,839 @@
+#!/usr/bin/env python3
+"""
+Fixed version of CPPCheck Dashboard Generator
+- Fixes header alignment
+- Makes rows clickable
+- Adds proper code context support
+
+
+⚠️ DEPRECATION WARNING: This generator is deprecated and will be removed in April 2025.
+Please use generate-standalone-virtual-dashboard.py instead.
+
+See generate/DEPRECATION_NOTICE.md for migration guide.
+"""
+
+import sys
+import warnings
+
+# Show deprecation warning
+warnings.warn(
+    "\n⚠️  DEPRECATION: generate-fixed-dashboard.py is deprecated.\n"
+    "   Please use generate-standalone-virtual-dashboard.py instead.\n"
+    "   See generate/DEPRECATION_NOTICE.md for details.\n",
+    DeprecationWarning,
+    stacklevel=2
+)
+print("\n⚠️  This generator is deprecated. Please use generate-standalone-virtual-dashboard.py\n", file=sys.stderr)
+
+import json
+from pathlib import Path
+from datetime import datetime
+import html
+import os
+
+class FixedDashboardGenerator:
+    def __init__(self, issues_file):
+        with open(issues_file) as f:
+            data = json.load(f)
+        self.issues = data.get('issues', [])
+        self.timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+    def generate(self, output_file):
+        """Generate the fixed dashboard with all features working"""
+        
+        # Calculate statistics
+        stats = self.calculate_stats()
+        
+        # Generate HTML
+        html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CPPCheck Studio - Dashboard</title>
+    
+    <!-- External Dependencies -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Highlight.js for syntax highlighting -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" rel="stylesheet">
+    
+    <style>
+        {self.generate_styles()}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1><i class="fas fa-code"></i> CPPCheck Studio Dashboard</h1>
+                <div class="header-info">
+                    <span><i class="fas fa-project-diagram"></i> LPZRobots</span>
+                    <span><i class="fas fa-clock"></i> {self.timestamp}</span>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Statistics Cards -->
+        <div class="stats-grid">
+            <div class="stat-card error">
+                <i class="fas fa-exclamation-circle"></i>
+                <h3>Errors</h3>
+                <div class="value">{stats['errors']}</div>
+                <div class="percent">{stats['error_percent']:.1f}%</div>
+            </div>
+            
+            <div class="stat-card warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h3>Warnings</h3>
+                <div class="value">{stats['warnings']}</div>
+                <div class="percent">{stats['warning_percent']:.1f}%</div>
+            </div>
+            
+            <div class="stat-card style">
+                <i class="fas fa-palette"></i>
+                <h3>Style</h3>
+                <div class="value">{stats['style']}</div>
+                <div class="percent">{stats['style_percent']:.1f}%</div>
+            </div>
+            
+            <div class="stat-card performance">
+                <i class="fas fa-tachometer-alt"></i>
+                <h3>Performance</h3>
+                <div class="value">{stats['performance']}</div>
+                <div class="percent">{stats['performance_percent']:.1f}%</div>
+            </div>
+        </div>
+        
+        <!-- Filter Controls -->
+        <div class="controls">
+            <div class="search-container">
+                <i class="fas fa-search"></i>
+                <input type="text" id="searchInput" placeholder="Search issues..." onkeyup="filterIssues()">
+            </div>
+            
+            <div class="filter-buttons">
+                <button class="filter-btn active" onclick="setFilter('all')">
+                    <i class="fas fa-list"></i> All ({stats['total']})
+                </button>
+                <button class="filter-btn error" onclick="setFilter('error')">
+                    <i class="fas fa-exclamation-circle"></i> Errors ({stats['errors']})
+                </button>
+                <button class="filter-btn warning" onclick="setFilter('warning')">
+                    <i class="fas fa-exclamation-triangle"></i> Warnings ({stats['warnings']})
+                </button>
+                <button class="filter-btn style" onclick="setFilter('style')">
+                    <i class="fas fa-palette"></i> Style ({stats['style']})
+                </button>
+                <button class="filter-btn performance" onclick="setFilter('performance')">
+                    <i class="fas fa-tachometer-alt"></i> Performance ({stats['performance']})
+                </button>
+            </div>
+        </div>
+        
+        <!-- Issues Table -->
+        <div class="issues-container">
+            <table class="issues-table" id="issuesTable">
+                <thead>
+                    <tr>
+                        <th>File</th>
+                        <th>Line</th>
+                        <th>Severity</th>
+                        <th>Message</th>
+                        <th>ID</th>
+                        <th style="width: 100px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="issuesBody">
+                    <!-- Issues will be populated by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Code Preview Modal -->
+        <div id="codeModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="modalTitle">Code Preview</h3>
+                    <button onclick="closeModal()" class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body" id="modalBody">
+                    <!-- Code content will be inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/cpp.min.js"></script>
+    
+    <script>
+        // Issues data
+        const issuesData = {json.dumps(self.issues[:1000])};  // Limit to first 1000 for performance
+        let currentFilter = 'all';
+        let currentSearch = '';
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {{
+            renderIssues();
+        }});
+        
+        // Render issues
+        function renderIssues() {{
+            const tbody = document.getElementById('issuesBody');
+            tbody.innerHTML = '';
+            
+            const filteredIssues = issuesData.filter(issue => {{
+                // Apply severity filter
+                if (currentFilter !== 'all' && issue.severity !== currentFilter) {{
+                    return false;
+                }}
+                
+                // Apply search filter
+                if (currentSearch) {{
+                    const searchLower = currentSearch.toLowerCase();
+                    return issue.file.toLowerCase().includes(searchLower) ||
+                           (issue.message || '').toLowerCase().includes(searchLower) ||
+                           (issue.id || '').toLowerCase().includes(searchLower);
+                }}
+                
+                return true;
+            }});
+            
+            // Render rows
+            filteredIssues.forEach((issue, index) => {{
+                const row = document.createElement('tr');
+                row.className = 'issue-row';
+                row.style.cursor = 'pointer';
+                
+                // Make entire row clickable
+                row.onclick = function() {{
+                    viewCode(index);
+                }};
+                
+                row.innerHTML = `
+                    <td class="file-cell">
+                        <i class="fas fa-file-code"></i> 
+                        ${{escapeHtml(getFileName(issue.file))}}
+                    </td>
+                    <td class="line-cell">${{issue.line}}</td>
+                    <td>
+                        <span class="severity-badge ${{issue.severity}}">
+                            ${{issue.severity}}
+                        </span>
+                    </td>
+                    <td class="message-cell" title="${{escapeHtml(issue.message || 'No message')}}">
+                        ${{escapeHtml(truncateMessage(issue.message || 'No message'))}}
+                    </td>
+                    <td class="id-cell">
+                        ${{escapeHtml(issue.id || 'N/A')}}
+                    </td>
+                    <td class="actions-cell">
+                        <button class="action-btn" onclick="viewCodeFromButton(event, ${{index}})" title="View Code">
+                            <i class="fas fa-code"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            }});
+            
+            // Update count
+            document.querySelector('.issues-container').dataset.count = filteredIssues.length + ' issues shown';
+        }}
+        
+        // Helper functions
+        function escapeHtml(text) {{
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }}
+        
+        function getFileName(path) {{
+            return path.split('/').pop();
+        }}
+        
+        function truncateMessage(message) {{
+            return message.length > 80 ? message.substring(0, 77) + '...' : message;
+        }}
+        
+        // Filter functions
+        function setFilter(filter) {{
+            currentFilter = filter;
+            
+            // Update button states
+            document.querySelectorAll('.filter-btn').forEach(btn => {{
+                btn.classList.remove('active');
+            }});
+            event.target.closest('.filter-btn').classList.add('active');
+            
+            renderIssues();
+        }}
+        
+        function filterIssues() {{
+            currentSearch = document.getElementById('searchInput').value;
+            renderIssues();
+        }}
+        
+        // View code from button (prevents row click)
+        function viewCodeFromButton(event, index) {{
+            event.stopPropagation();
+            viewCode(index);
+        }}
+        
+        // Modal functions
+        function viewCode(index) {{
+            const issue = filteredIssues[index] || issuesData[index];
+            const modal = document.getElementById('codeModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalBody = document.getElementById('modalBody');
+            
+            modalTitle.textContent = `${{getFileName(issue.file)}}:${{issue.line}}`;
+            
+            // Create code preview content
+            let modalContent = '<div style="padding: 20px;">';
+            
+            // Issue details
+            modalContent += `
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                    <h4 style="margin-top: 0;">Issue Details</h4>
+                    <p><strong>File:</strong> ${{escapeHtml(issue.file)}}</p>
+                    <p><strong>Line:</strong> ${{issue.line}}</p>
+                    <p><strong>Severity:</strong> <span class="severity-badge ${{issue.severity}}">${{issue.severity}}</span></p>
+                    <p><strong>Type:</strong> ${{escapeHtml(issue.id || 'N/A')}}</p>
+                    <p><strong>Message:</strong> ${{escapeHtml(issue.message || 'No message')}}</p>
+                </div>
+            `;
+            
+            // Code context
+            if (issue.code_context && issue.code_context.lines && issue.code_context.lines.length > 0) {{
+                modalContent += '<h4>Code Context</h4>';
+                modalContent += '<pre style="background: #f6f8fa; padding: 15px; border-radius: 8px; overflow-x: auto;"><code class="language-cpp">';
+                
+                issue.code_context.lines.forEach(line => {{
+                    const isTarget = line.is_target || line.number === issue.line;
+                    const lineStyle = isTarget ? 'background: #ffeeee; font-weight: bold;' : '';
+                    modalContent += `<span style="${{lineStyle}}">$${{String(line.number).padStart(4)}}:  $${{escapeHtml(line.content)}}</span>\\n`;
+                }});
+                
+                modalContent += '</code></pre>';
+            }} else {{
+                // Try to load the file content if possible
+                modalContent += `
+                    <div style="background: #f8f9fa; padding: 20px; text-align: center; border-radius: 8px;">
+                        <i class="fas fa-info-circle" style="font-size: 2em; color: #6c757d; margin-bottom: 10px;"></i>
+                        <p style="color: #6c757d; margin: 0;">Code context not available</p>
+                        <p style="color: #6c757d; font-size: 0.9em;">The analysis data doesn't include code snippets for this issue.</p>
+                    </div>
+                `;
+            }}
+            
+            modalContent += '</div>';
+            modalBody.innerHTML = modalContent;
+            
+            // Apply syntax highlighting if code is present
+            modalBody.querySelectorAll('pre code').forEach(block => {{
+                hljs.highlightElement(block);
+            }});
+            
+            modal.style.display = 'block';
+        }}
+        
+        function closeModal() {{
+            document.getElementById('codeModal').style.display = 'none';
+        }}
+        
+        // Close modal on outside click
+        window.onclick = function(event) {{
+            const modal = document.getElementById('codeModal');
+            if (event.target === modal) {{
+                modal.style.display = 'none';
+            }}
+        }}
+        
+        // Add keyboard navigation
+        document.addEventListener('keydown', function(e) {{
+            if (e.key === 'Escape') {{
+                closeModal();
+            }}
+        }});
+    </script>
+</body>
+</html>"""
+        
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+            
+        print(f"✅ Fixed dashboard generated: {output_file}")
+        print(f"   Total issues: {len(self.issues)}")
+        print(f"   File size: {Path(output_file).stat().st_size / 1024:.1f} KB")
+        
+    def calculate_stats(self):
+        """Calculate issue statistics"""
+        total = len(self.issues)
+        if total == 0:
+            return {
+                'total': 0,
+                'errors': 0,
+                'warnings': 0,
+                'style': 0,
+                'performance': 0,
+                'error_percent': 0,
+                'warning_percent': 0,
+                'style_percent': 0,
+                'performance_percent': 0
+            }
+            
+        stats = {
+            'total': total,
+            'errors': sum(1 for i in self.issues if i.get('severity') == 'error'),
+            'warnings': sum(1 for i in self.issues if i.get('severity') == 'warning'),
+            'style': sum(1 for i in self.issues if i.get('severity') == 'style'),
+            'performance': sum(1 for i in self.issues if i.get('severity') == 'performance')
+        }
+        
+        # Calculate percentages
+        stats['error_percent'] = (stats['errors'] / total) * 100 if total > 0 else 0
+        stats['warning_percent'] = (stats['warnings'] / total) * 100 if total > 0 else 0
+        stats['style_percent'] = (stats['style'] / total) * 100 if total > 0 else 0
+        stats['performance_percent'] = (stats['performance'] / total) * 100 if total > 0 else 0
+            
+        return stats
+        
+    def generate_styles(self):
+        """Generate comprehensive CSS styles"""
+        return """
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f5f7fa;
+            color: #2d3748;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 0;
+            margin: -20px -20px 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            font-size: 2em;
+            font-weight: 700;
+        }
+        
+        .header-info {
+            display: flex;
+            gap: 20px;
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        
+        /* Statistics Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            text-align: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .stat-card i {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            opacity: 0.8;
+        }
+        
+        .stat-card h3 {
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #718096;
+            margin-bottom: 10px;
+        }
+        
+        .stat-card .value {
+            font-size: 2.5em;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .stat-card .percent {
+            font-size: 0.9em;
+            color: #718096;
+        }
+        
+        /* Card colors */
+        .stat-card.error { border-top: 4px solid #f56565; }
+        .stat-card.error i { color: #f56565; }
+        .stat-card.error .value { color: #e53e3e; }
+        
+        .stat-card.warning { border-top: 4px solid #ed8936; }
+        .stat-card.warning i { color: #ed8936; }
+        .stat-card.warning .value { color: #dd6b20; }
+        
+        .stat-card.style { border-top: 4px solid #667eea; }
+        .stat-card.style i { color: #667eea; }
+        .stat-card.style .value { color: #5a67d8; }
+        
+        .stat-card.performance { border-top: 4px solid #48bb78; }
+        .stat-card.performance i { color: #48bb78; }
+        .stat-card.performance .value { color: #38a169; }
+        
+        /* Controls */
+        .controls {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .search-container {
+            flex: 1;
+            min-width: 300px;
+            position: relative;
+        }
+        
+        .search-container i {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #a0aec0;
+        }
+        
+        .search-container input {
+            width: 100%;
+            padding: 10px 15px 10px 40px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 0.95em;
+            transition: border-color 0.2s;
+        }
+        
+        .search-container input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .filter-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .filter-btn {
+            padding: 8px 16px;
+            border: 1px solid #e2e8f0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .filter-btn:hover {
+            background: #f7fafc;
+            border-color: #cbd5e0;
+        }
+        
+        .filter-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        
+        .filter-btn.error:hover { border-color: #f56565; color: #f56565; }
+        .filter-btn.warning:hover { border-color: #ed8936; color: #ed8936; }
+        .filter-btn.style:hover { border-color: #667eea; color: #667eea; }
+        .filter-btn.performance:hover { border-color: #48bb78; color: #48bb78; }
+        
+        /* Issues Table */
+        .issues-container {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            position: relative;
+        }
+        
+        .issues-container::before {
+            content: attr(data-count);
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            font-size: 0.85em;
+            color: #718096;
+            z-index: 10;
+        }
+        
+        .issues-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        
+        .issues-table thead {
+            background: #f7fafc;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .issues-table th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.85em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #4a5568;
+        }
+        
+        .issues-table tbody tr {
+            border-bottom: 1px solid #e2e8f0;
+            transition: background 0.1s;
+        }
+        
+        .issues-table tbody tr:hover {
+            background: #f7fafc;
+        }
+        
+        .issue-row {
+            cursor: pointer;
+        }
+        
+        .issues-table td {
+            padding: 15px;
+            font-size: 0.95em;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .file-cell {
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 0.9em;
+            color: #4a5568;
+            width: 20%;
+        }
+        
+        .line-cell {
+            font-family: 'Monaco', 'Consolas', monospace;
+            color: #718096;
+            text-align: center;
+            width: 80px;
+        }
+        
+        .message-cell {
+            width: 40%;
+        }
+        
+        .id-cell {
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 0.85em;
+            color: #718096;
+            width: 15%;
+        }
+        
+        .severity-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .severity-badge.error {
+            background: #fed7d7;
+            color: #c53030;
+        }
+        
+        .severity-badge.warning {
+            background: #feebc8;
+            color: #c05621;
+        }
+        
+        .severity-badge.style {
+            background: #e0e7ff;
+            color: #3730a3;
+        }
+        
+        .severity-badge.performance {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .severity-badge.information {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+        
+        .actions-cell {
+            text-align: center;
+            width: 100px;
+        }
+        
+        .action-btn {
+            padding: 6px 10px;
+            border: 1px solid #e2e8f0;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+            margin: 0 2px;
+            transition: all 0.2s;
+        }
+        
+        .action-btn:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            animation: fadeIn 0.2s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .modal-content {
+            background: white;
+            margin: 50px auto;
+            width: 90%;
+            max-width: 900px;
+            max-height: 80vh;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            animation: slideIn 0.3s;
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        .modal-header {
+            background: #f7fafc;
+            padding: 20px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-header h3 {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #2d3748;
+        }
+        
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            cursor: pointer;
+            color: #718096;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        
+        .close-btn:hover {
+            background: #e2e8f0;
+            color: #2d3748;
+        }
+        
+        .modal-body {
+            padding: 20px;
+            max-height: calc(80vh - 80px);
+            overflow-y: auto;
+        }
+        
+        .modal-body pre {
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            overflow-x: auto;
+        }
+        
+        .modal-body code {
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+        """
+
+if __name__ == '__main__':
+    import sys
+    
+    if len(sys.argv) < 2:
+        print("Usage: generate-fixed-dashboard.py <analysis.json> [output.html]")
+        sys.exit(1)
+        
+    input_file = sys.argv[1]
+    output_file = sys.argv[2] if len(sys.argv) > 2 else 'fixed-dashboard.html'
+    
+    generator = FixedDashboardGenerator(input_file)
+    generator.generate(output_file)

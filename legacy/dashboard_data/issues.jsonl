@@ -1,0 +1,2 @@
+{"id": "uninitvar", "severity": "error", "message": "Uninitialized variable: x", "file": "test.cpp", "line": 42}
+{"id": "unusedVariable", "severity": "style", "message": "Unused variable: temp", "file": "test.cpp", "line": 15}

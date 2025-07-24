@@ -1,0 +1,11 @@
+{
+  "analysis_id": "enhanced-dashboard-test-1753217163",
+  "repository": "jerryzhao173985/lpz",
+  "status": "completed",
+  "workflow_run_id": "16455156561",
+  "workflow_run_url": "https://github.com/jerryzhao173985/cppcheck-studio/actions/runs/16455156561",
+  "completed_at": "2025-07-22T20:47:34Z",
+  "files_analyzed": 500,
+  "issues_found": 1160,
+  "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/enhanced-dashboard-test-1753217163/index.html"
+}

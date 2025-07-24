@@ -1,5 +1,5 @@
 {
-  "name": "cppcheck-dashboard-generator",
+  "name": "@jerryzhao173985/cppcheck-dashboard-generator",
   "version": "1.0.1",
   "description": "Generate beautiful, interactive HTML dashboards from cppcheck JSON output with virtual scrolling",
   "main": "dist/index.js",
@@ -41,11 +41,11 @@
     "visualization",
     "html-report"
   ],
-  "author": "CPPCheck Dashboard Team",
+  "author": "Jerry Zhao <jerryzhao173985@gmail.com>",
   "license": "MIT",
-  "homepage": "https://github.com/yourusername/cppcheck-dashboard-generator#readme",
+  "homepage": "https://jerryzhao173985.github.io/cppcheck-studio/",
   "bugs": {
-    "url": "https://github.com/yourusername/cppcheck-dashboard-generator/issues"
+    "url": "https://github.com/jerryzhao173985/cppcheck-studio/issues"
   },
   "dependencies": {
     "chalk": "^4.1.2",
@@ -75,6 +75,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/cppcheck-dashboard-generator"
+    "url": "git+https://github.com/jerryzhao173985/cppcheck-studio.git",
+    "directory": "cppcheck-dashboard-generator"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   }
 }

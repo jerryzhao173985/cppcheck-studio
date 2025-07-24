@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Dashboard Functionality</title>
+</head>
+<body>
+    <h1>Testing Dashboard Code Context</h1>
+    <p>Open console to see test results</p>
+    
+    <script>
+        // Sample issue with code context
+        const testIssue = {
+            "file": "selforg/utils/position.cpp",
+            "location": {"line": 17},
+            "severity": "style",
+            "message": "The function 'print' is never used.",
+            "id": "unusedFunction",
+            "code_context": {
+                "lines": [
+                    {"number": 12, "content": "namespace lpzrobots {"},
+                    {"number": 13, "content": ""},
+                    {"number": 14, "content": "  Position::Position(){}"},
+                    {"number": 15, "content": ""},
+                    {"number": 16, "content": "  /// CRITICAL"},
+                    {"number": 17, "content": "  void Position::print(){", "is_target": true},
+                    {"number": 18, "content": "    using namespace std;"},
+                    {"number": 19, "content": "    cout << \"Pos: \" << x << \", \" << y << \", \" << z << endl;"},
+                    {"number": 20, "content": "  }"},
+                    {"number": 21, "content": ""},
+                    {"number": 22, "content": "}"}
+                ],
+                "target_line": 17
+            }
+        };
+        
+        console.log("Test Issue:", testIssue);
+        
+        // Test modal display function
+        function showIssueDetails(issue) {
+            console.log("=== Testing Issue Display ===");
+            console.log("File:", issue.file);
+            console.log("Line:", issue.location.line);
+            console.log("Message:", issue.message);
+            console.log("Has code context:", !!issue.code_context);
+            
+            if (issue.code_context) {
+                console.log("Code context lines:", issue.code_context.lines.length);
+                console.log("Target line:", issue.code_context.target_line);
+                
+                // Build code display
+                let codeHtml = '<pre><code class="language-cpp">';
+                issue.code_context.lines.forEach(line => {
+                    const lineClass = line.is_target ? 'highlight-line' : '';
+                    const lineNum = String(line.number).padStart(4, ' ');
+                    codeHtml += `<span class="${lineClass}">${lineNum}: ${escapeHtml(line.content)}</span>\n`;
+                });
+                codeHtml += '</code></pre>';
+                
+                console.log("Generated code HTML length:", codeHtml.length);
+                console.log("Sample HTML:", codeHtml.substring(0, 200) + "...");
+            }
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Test the function
+        showIssueDetails(testIssue);
+    </script>
+</body>
+</html>

@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<results version="2">
+    <cppcheck version="2.13.0"/>
+    <errors>
+        <error id="missingIncludeSystem" severity="information" msg="Include file: &lt;iostream&gt; not found. Please note: Cppcheck does not need standard library headers to get proper results." verbose="Include file: &lt;iostream&gt; not found. Please note: Cppcheck does not need standard library headers to get proper results.">
+            <location file="src/main.cpp" line="1" column="0"/>
+        </error>
+        <error id="missingIncludeSystem" severity="information" msg="Include file: &lt;vector&gt; not found. Please note: Cppcheck does not need standard library headers to get proper results." verbose="Include file: &lt;vector&gt; not found. Please note: Cppcheck does not need standard library headers to get proper results.">
+            <location file="src/main.cpp" line="2" column="0"/>
+        </error>
+        <error id="functionStatic" severity="performance" msg="Technically the member function &apos;TestClass::process&apos; can be static (but you may consider moving to unnamed namespace)." verbose="The member function &apos;TestClass::process&apos; can be made a static function. Making a function static can bring a performance benefit since no &apos;this&apos; instance is passed to the function. This change should not cause compiler errors but it does not necessarily make sense conceptually. Think about your design and the task of the function first - is it a function that must not access members of class instances? And maybe it is more appropriate to move this function to an unnamed namespace." cwe="398" inconclusive="true" file0="src/main.cpp">
+            <location file="src/main.cpp" line="15" column="10"/>
+            <symbol>TestClass::process</symbol>
+        </error>
+        <error id="functionStatic" severity="performance" msg="Technically the member function &apos;TestClass::unnecessaryFunction&apos; can be static (but you may consider moving to unnamed namespace)." verbose="The member function &apos;TestClass::unnecessaryFunction&apos; can be made a static function. Making a function static can bring a performance benefit since no &apos;this&apos; instance is passed to the function. This change should not cause compiler errors but it does not necessarily make sense conceptually. Think about your design and the task of the function first - is it a function that must not access members of class instances? And maybe it is more appropriate to move this function to an unnamed namespace." cwe="398" inconclusive="true" file0="src/main.cpp">
+            <location file="src/main.cpp" line="23" column="10"/>
+            <symbol>TestClass::unnecessaryFunction</symbol>
+        </error>
+        <error id="noCopyConstructor" severity="warning" msg="Class &apos;TestClass&apos; does not have a copy constructor which is recommended since it has dynamic memory/resource allocation(s)." verbose="Class &apos;TestClass&apos; does not have a copy constructor which is recommended since it has dynamic memory/resource allocation(s)." cwe="398" file0="src/main.cpp">
+            <location file="src/main.cpp" line="10" column="9"/>
+            <symbol>TestClass</symbol>
+        </error>
+        <error id="noOperatorEq" severity="warning" msg="Class &apos;TestClass&apos; does not have a operator= which is recommended since it has dynamic memory/resource allocation(s)." verbose="Class &apos;TestClass&apos; does not have a operator= which is recommended since it has dynamic memory/resource allocation(s)." cwe="398" file0="src/main.cpp">
+            <location file="src/main.cpp" line="10" column="9"/>
+            <symbol>TestClass</symbol>
+        </error>
+        <error id="noDestructor" severity="warning" msg="Class &apos;TestClass&apos; does not have a destructor which is recommended since it has dynamic memory/resource allocation(s)." verbose="Class &apos;TestClass&apos; does not have a destructor which is recommended since it has dynamic memory/resource allocation(s)." cwe="398" file0="src/main.cpp">
+            <location file="src/main.cpp" line="10" column="9"/>
+            <symbol>TestClass</symbol>
+        </error>
+        <error id="noExplicitConstructor" severity="style" msg="Class &apos;TestClass&apos; has a constructor with 1 argument that is not explicit." verbose="Class &apos;TestClass&apos; has a constructor with 1 argument that is not explicit. Such, so called &quot;Converting constructors&quot;, should in general be explicit for type safety reasons as that prevents unintended implicit conversions." cwe="398" file0="src/main.cpp">
+            <location file="src/main.cpp" line="9" column="5"/>
+            <symbol>TestClass</symbol>
+        </error>
+        <error id="unsafeClassCanLeak" severity="style" msg="Class &apos;TestClass&apos; is unsafe, &apos;TestClass::data&apos; can leak by wrong usage." verbose="The class &apos;TestClass&apos; is unsafe, wrong usage can cause memory/resource leaks for &apos;TestClass::data&apos;. This can for instance be fixed by adding proper cleanup in the destructor." cwe="398" file0="src/main.cpp">
+            <location file="src/main.cpp" line="6" column="10"/>
+            <symbol>TestClass</symbol>
+            <symbol>TestClass::data</symbol>
+        </error>
+        <error id="nullPointer" severity="error" msg="Null pointer dereference: ptr" verbose="Null pointer dereference: ptr" cwe="476" file0="src/main.cpp">
+            <location file="src/main.cpp" line="20" column="10" info="Null pointer dereference"/>
+            <location file="src/main.cpp" line="19" column="20" info="Assignment &apos;ptr=nullptr&apos;, assigned value is 0"/>
+            <symbol>ptr</symbol>
+        </error>
+        <error id="containerOutOfBounds" severity="error" msg="Out of bounds access in expression &apos;v[10]&apos; because &apos;v&apos; is empty." verbose="Out of bounds access in expression &apos;v[10]&apos; because &apos;v&apos; is empty." cwe="398" file0="src/main.cpp">
+            <location file="src/main.cpp" line="32" column="6" info="Access out of bounds"/>
+            <symbol>v</symbol>
+        </error>
+        <error id="uninitvar" severity="error" msg="Uninitialized variable: uninitializedVar" verbose="Uninitialized variable: uninitializedVar" cwe="457" file0="src/main.cpp">
+            <location file="src/main.cpp" line="17" column="22"/>
+            <symbol>uninitializedVar</symbol>
+        </error>
+        <error id="unassignedVariable" severity="style" msg="Variable &apos;uninitializedVar&apos; is not assigned a value." verbose="Variable &apos;uninitializedVar&apos; is not assigned a value." cwe="665" file0="src/main.cpp">
+            <location file="src/main.cpp" line="16" column="13"/>
+            <symbol>uninitializedVar</symbol>
+        </error>
+        <error id="unreadVariable" severity="style" msg="Variable &apos;localVar&apos; is assigned a value that is never used." verbose="Variable &apos;localVar&apos; is assigned a value that is never used." cwe="563" file0="src/main.cpp">
+            <location file="src/main.cpp" line="25" column="22"/>
+            <symbol>localVar</symbol>
+        </error>
+        <error id="unreadVariable" severity="style" msg="Variable &apos;v[10]&apos; is assigned a value that is never used." verbose="Variable &apos;v[10]&apos; is assigned a value that is never used." cwe="563" file0="src/main.cpp">
+            <location file="src/main.cpp" line="32" column="11"/>
+            <symbol>v[10]</symbol>
+        </error>
+        <error id="unusedFunction" severity="style" msg="The function &apos;unnecessaryFunction&apos; is never used." verbose="The function &apos;unnecessaryFunction&apos; is never used." cwe="561">
+            <location file="src/main.cpp" line="23" column="0"/>
+            <symbol>unnecessaryFunction</symbol>
+        </error>
+        <error id="checkersReport" severity="information" msg="Active checkers: 172/592 (use --checkers-report=&lt;filename&gt; to see details)" verbose="Active checkers: 172/592 (use --checkers-report=&lt;filename&gt; to see details)"/>
+    </errors>
+</results>

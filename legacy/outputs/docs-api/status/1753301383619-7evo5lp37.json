@@ -1,0 +1,28 @@
+{
+  "analysis_id": "1753301383619-7evo5lp37",
+  "repository": "jerryzhao173985/lpz",
+  "status": "completed",
+  "step": "completed",
+  "workflow_run_id": "16480776374",
+  "workflow_run_url": "https://github.com/jerryzhao173985/cppcheck-studio/actions/runs/16480776374",
+  "completed_at": "2025-07-23T20:11:58Z",
+  "files_analyzed": 1603,
+  "filesAnalyzed": 1603,
+  "issues_found": 2702,
+  "issues": {
+    "total": 2702,
+    "error": 77,
+    "warning": 212,
+    "style": 1501,
+    "performance": 119,
+    "portability": 8,
+    "information": 785
+  },
+  "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/1753301383619-7evo5lp37/index.html",
+  "dashboardUrl": "https://jerryzhao173985.github.io/cppcheck-studio/results/1753301383619-7evo5lp37/index.html",
+  "progress": {
+    "steps_completed": 5,
+    "total_steps": 5,
+    "current_step": "completed"
+  }
+}

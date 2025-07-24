@@ -1,7 +1,0 @@
-export * from './components/button'
-export * from './components/card'
-export * from './components/dialog'
-export * from './components/tabs'
-export * from './components/badge'
-export * from './components/tooltip'
-export * from './lib/utils'

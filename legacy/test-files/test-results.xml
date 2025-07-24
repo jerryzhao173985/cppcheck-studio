@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<results version="2">
+    <cppcheck version="2.17.1"/>
+    <errors>
+        <error id="missingIncludeSystem" severity="information" msg="Include file: &lt;iostream&gt; not found. Please note: Cppcheck does not need standard library headers to get proper results." verbose="Include file: &lt;iostream&gt; not found. Please note: Cppcheck does not need standard library headers to get proper results.">
+            <location file="test-project/test.cpp" line="1" column="0"/>
+        </error>
+        <error id="memleak" severity="error" msg="Memory leak: leak" verbose="Memory leak: leak" cwe="401" file0="test-project/test.cpp">
+            <location file="test-project/test.cpp" line="12" column="5"/>
+            <symbol>leak</symbol>
+        </error>
+        <error id="nullPointer" severity="error" msg="Null pointer dereference: ptr" verbose="Null pointer dereference: ptr" cwe="476" file0="test-project/test.cpp">
+            <location file="test-project/test.cpp" line="5" column="6" info="Null pointer dereference"/>
+            <location file="test-project/test.cpp" line="4" column="16" info="Assignment &apos;ptr=nullptr&apos;, assigned value is 0"/>
+            <symbol>ptr</symbol>
+        </error>
+        <error id="constVariablePointer" severity="style" msg="Variable &apos;leak&apos; can be declared as pointer to const" verbose="Variable &apos;leak&apos; can be declared as pointer to const" cwe="398" file0="test-project/test.cpp">
+            <location file="test-project/test.cpp" line="10" column="10" info="Variable &apos;leak&apos; can be declared as pointer to const"/>
+            <symbol>leak</symbol>
+        </error>
+        <error id="uninitvar" severity="error" msg="Uninitialized variable: uninit" verbose="Uninitialized variable: uninit" cwe="457" file0="test-project/test.cpp">
+            <location file="test-project/test.cpp" line="8" column="18"/>
+            <symbol>uninit</symbol>
+        </error>
+        <error id="unreadVariable" severity="style" msg="Variable &apos;leak&apos; is assigned a value that is never used." verbose="Variable &apos;leak&apos; is assigned a value that is never used." cwe="563" file0="test-project/test.cpp">
+            <location file="test-project/test.cpp" line="10" column="15"/>
+            <symbol>leak</symbol>
+        </error>
+        <error id="unassignedVariable" severity="style" msg="Variable &apos;uninit&apos; is not assigned a value." verbose="Variable &apos;uninit&apos; is not assigned a value." cwe="665" file0="test-project/test.cpp">
+            <location file="test-project/test.cpp" line="7" column="9"/>
+            <symbol>uninit</symbol>
+        </error>
+        <error id="unusedAllocatedMemory" severity="style" msg="Variable &apos;leak&apos; is allocated memory that is never used." verbose="Variable &apos;leak&apos; is allocated memory that is never used." cwe="563" file0="test-project/test.cpp">
+            <location file="test-project/test.cpp" line="10" column="10"/>
+            <symbol>leak</symbol>
+        </error>
+        <error id="checkersReport" severity="information" msg="Active checkers: 167/856 (use --checkers-report=&lt;filename&gt; to see details)" verbose="Active checkers: 167/856 (use --checkers-report=&lt;filename&gt; to see details)"/>
+    </errors>
+</results>

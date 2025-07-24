@@ -1,0 +1,11 @@
+{
+  "analysis_id": "1753203010230-acau0p806",
+  "repository": "jerryzhao173985/lpz",
+  "status": "completed",
+  "workflow_run_id": "16450536050",
+  "workflow_run_url": "https://github.com/jerryzhao173985/cppcheck-studio/actions/runs/16450536050",
+  "completed_at": "2025-07-22T16:52:24Z",
+  "files_analyzed": 1603,
+  "issues_found": 3277,
+  "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/1753203010230-acau0p806/index.html"
+}

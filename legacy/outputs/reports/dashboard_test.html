@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Testing Page</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .dashboard-frame {
+            width: 100%;
+            height: 600px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            margin: 20px 0;
+            background: white;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .info {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 14px;
+            margin-left: 10px;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .metric {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .metric h3 {
+            margin: 0 0 10px 0;
+            font-size: 18px;
+            color: #333;
+        }
+        .metric p {
+            margin: 0;
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>CPPCheck Studio Dashboard Testing</h1>
+        
+        <div class="info">
+            <h2>Test Results Summary</h2>
+            <div class="metrics">
+                <div class="metric">
+                    <h3>Ultimate Dashboard</h3>
+                    <p>0.24 MB</p>
+                    <small>10 features</small>
+                </div>
+                <div class="metric">
+                    <h3>Enhanced Dashboard</h3>
+                    <p>18.22 MB</p>
+                    <small>10 features</small>
+                </div>
+                <div class="metric">
+                    <h3>Size Difference</h3>
+                    <p>76x</p>
+                    <small>Ultimate is smaller</small>
+                </div>
+                <div class="metric">
+                    <h3>Recommendation</h3>
+                    <p>Ultimate</p>
+                    <small>Better performance</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button onclick="loadDashboard('test-dashboard-final.html')">Load Ultimate Dashboard</button>
+            <button onclick="loadDashboard('test-enhanced.html')">Load Enhanced Dashboard</button>
+            <button onclick="testFeatures()">Test Features</button>
+            <button onclick="measurePerformance()">Measure Performance</button>
+        </div>
+        
+        <div id="status"></div>
+        
+        <iframe id="dashboardFrame" class="dashboard-frame" src="test-dashboard-final.html"></iframe>
+        
+        <div class="info">
+            <h3>Feature Testing Results</h3>
+            <div id="featureResults"></div>
+        </div>
+        
+        <div class="info">
+            <h3>Performance Metrics</h3>
+            <div id="performanceResults"></div>
+        </div>
+    </div>
+    
+    <script>
+        function loadDashboard(file) {
+            const frame = document.getElementById('dashboardFrame');
+            const status = document.getElementById('status');
+            
+            const startTime = performance.now();
+            frame.src = file;
+            
+            frame.onload = function() {
+                const loadTime = performance.now() - startTime;
+                status.innerHTML = `<span class="status success">Loaded ${file} in ${loadTime.toFixed(2)}ms</span>`;
+            };
+            
+            frame.onerror = function() {
+                status.innerHTML = `<span class="status error">Failed to load ${file}</span>`;
+            };
+        }
+        
+        function testFeatures() {
+            const frame = document.getElementById('dashboardFrame');
+            const results = document.getElementById('featureResults');
+            
+            try {
+                const doc = frame.contentDocument || frame.contentWindow.document;
+                
+                const features = {
+                    'Search Input': doc.getElementById('searchInput') || doc.querySelector('input[type="search"]'),
+                    'Filter Buttons': doc.querySelectorAll('button').length > 0,
+                    'Issues Table': doc.querySelector('table') || doc.querySelector('.issue'),
+                    'Statistics': doc.querySelector('.stat-card') || doc.querySelector('.summary-card'),
+                    'Modal': doc.querySelector('.modal') || doc.getElementById('codeModal'),
+                    'Code Highlighting': doc.querySelector('pre code') || doc.querySelector('.hljs'),
+                    'Export Button': Array.from(doc.querySelectorAll('button')).some(b => b.textContent.match(/export|download/i))
+                };
+                
+                let html = '<ul>';
+                for (const [feature, present] of Object.entries(features)) {
+                    html += `<li>${feature}: ${present ? '✅ Present' : '❌ Missing'}</li>`;
+                }
+                html += '</ul>';
+                
+                results.innerHTML = html;
+            } catch (e) {
+                results.innerHTML = '<p class="status error">Cannot access iframe content (cross-origin)</p>';
+            }
+        }
+        
+        function measurePerformance() {
+            const frame = document.getElementById('dashboardFrame');
+            const results = document.getElementById('performanceResults');
+            
+            try {
+                const doc = frame.contentDocument || frame.contentWindow.document;
+                
+                // Get performance metrics
+                const perf = frame.contentWindow.performance;
+                const timing = perf.timing;
+                const memory = perf.memory;
+                
+                const metrics = {
+                    'DOM Content Loaded': timing.domContentLoadedEventEnd - timing.domContentLoadedEventStart,
+                    'Page Load Time': timing.loadEventEnd - timing.navigationStart,
+                    'DOM Interactive': timing.domInteractive - timing.navigationStart,
+                    'First Paint': perf.getEntriesByType('paint')[0]?.startTime || 'N/A',
+                    'Memory Used': memory ? `${(memory.usedJSHeapSize / 1048576).toFixed(2)} MB` : 'N/A',
+                    'Total Memory': memory ? `${(memory.totalJSHeapSize / 1048576).toFixed(2)} MB` : 'N/A'
+                };
+                
+                let html = '<ul>';
+                for (const [metric, value] of Object.entries(metrics)) {
+                    html += `<li>${metric}: <strong>${typeof value === 'number' ? value.toFixed(2) + 'ms' : value}</strong></li>`;
+                }
+                html += '</ul>';
+                
+                results.innerHTML = html;
+            } catch (e) {
+                results.innerHTML = '<p class="status error">Cannot measure performance (cross-origin or missing data)</p>';
+            }
+        }
+        
+        // Auto-test on load
+        window.onload = function() {
+            setTimeout(testFeatures, 1000);
+            setTimeout(measurePerformance, 1500);
+        };
+    </script>
+</body>
+</html>
