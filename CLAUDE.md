@@ -15,7 +15,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### 2. ✅ Python Scripts (ORIGINAL, BATTLE-TESTED)
 - **Location**: `generate/` directory
 - **Status**: Complete, production-ready
-- **Best Script**: `generate-standalone-virtual-dashboard.py`
+- **Best Script**: `generate/generate-standalone-virtual-dashboard.py`
 - **Features**: Multiple dashboard types, zero dependencies
 
 ### 3. ⚠️ Monorepo Structure (INCOMPLETE)
@@ -54,10 +54,11 @@ node dist/cli.js ../data/analysis-with-context.json dashboard.html
 ```
 generate/
 ├── generate-standalone-virtual-dashboard.py  # ✅ RECOMMENDED - Virtual scrolling
-├── generate-ultimate-dashboard.py           # ✅ Best for most cases
 ├── generate-production-dashboard.py        # ✅ Minimal, no code context
-├── generate-robust-dashboard.py            # ✅ Error handling
-└── generate-split-dashboard.py             # ✅ Splits data into files
+├── generate-virtual-scroll-dashboard.py    # ✅ For very large datasets
+├── generate-split-dashboard.py             # ✅ Splits data into files
+├── generate-optimized-dashboard.py         # ⚠️ For workflow compatibility
+└── generate-simple-dashboard.py            # ⚠️ For workflow compatibility
 ```
 
 **Usage:**
@@ -107,10 +108,10 @@ tools/cppcheck/cppcheck cpp17 --format json > analysis.json
 ```bash
 cd cppcheck-studio
 # Best option for production use:
-python3 generate-ultimate-dashboard.py ../analysis.json my-dashboard.html
+python3 generate/generate-standalone-virtual-dashboard.py ../analysis.json my-dashboard.html
 
 # For large datasets with virtual scrolling:
-python3 generate-virtual-scroll-dashboard.py ../analysis.json virtual-dashboard.html
+python3 generate/generate-virtual-scroll-dashboard.py ../analysis.json virtual-dashboard.html
 
 # Open in browser
 open my-dashboard.html
@@ -119,8 +120,8 @@ open my-dashboard.html
 3. **Add Code Context (Optional)**
 ```bash
 # This adds code snippets around each issue
-python3 add-code-context.py analysis.json analysis-with-context.json
-python3 generate-ultimate-dashboard.py analysis-with-context.json dashboard-with-code.html
+python3 utils/add-code-context.py analysis.json analysis-with-context.json
+python3 generate/generate-standalone-virtual-dashboard.py analysis-with-context.json dashboard-with-code.html
 ```
 
 ### Dashboard Features
@@ -170,32 +171,29 @@ The project successfully analyzed the LPZRobots C++ codebase:
 
 ### Available Dashboard Generators
 
-1. **generate-ultimate-dashboard.py** ✅ RECOMMENDED
+**Active Generators:**
+
+1. **generate-standalone-virtual-dashboard.py** ✅ RECOMMENDED
    - File size: ~240KB
-   - Features: All interactive features, clean UI
-   - Performance: Excellent, loads instantly
-   - Use case: Production dashboards
+   - Features: All interactive features, virtual scrolling
+   - Performance: Excellent, handles 100,000+ issues
+   - Use case: Most users should use this
 
-2. **generate-virtual-scroll-dashboard.py** ✅ For Large Datasets
-   - Virtual scrolling for 10,000+ issues
-   - Memory efficient
-   - JSONL data format
-   - Use case: Very large codebases
-
-3. **generate-robust-dashboard.py** ✅ Error Handling
-   - Comprehensive error handling
-   - Chunked rendering (100 issues at a time)
-   - Progress indicators
-   - Use case: When reliability is critical
-
-4. **generate-production-dashboard.py** ✅ Minimal
+2. **generate-production-dashboard.py** ✅ Minimal
    - No embedded code context
    - Smallest file size
-   - Use case: Quick overview without code
+   - Use case: Quick overview, CI/CD pipelines
 
-5. **generate-split-dashboard.py** ✅ Modular
+3. **generate-virtual-scroll-dashboard.py** ✅ For Huge Datasets
+   - Optimized for 1,000,000+ issues
+   - Memory efficient JSONL format
+   - Use case: Extremely large codebases
+
+4. **generate-split-dashboard.py** ✅ Modular
    - Separates issues and context into different files
    - Use case: When you need to process data separately
+
+**Note**: Other generators (generate-ultimate, generate-robust, etc.) have been moved to legacy/generators/
 
 ## 🐛 Known Issues & Limitations
 
@@ -230,11 +228,11 @@ tools/cppcheck/cppcheck cpp17 --format json | tail -n +4 > analysis.json
 #### Problem: Code context not showing
 **Solution**: Use add-code-context.py before generating dashboard
 ```bash
-python3 add-code-context.py analysis.json analysis-with-context.json
+python3 utils/add-code-context.py analysis.json analysis-with-context.json
 ```
 
 #### Problem: Dashboard too large
-**Solution**: Use generate-virtual-scroll-dashboard.py for large datasets or generate-production-dashboard.py for minimal size
+**Solution**: Use generate/generate-virtual-scroll-dashboard.py for large datasets or generate/generate-production-dashboard.py for minimal size
 
 ## 📈 Performance Characteristics
 
@@ -359,9 +357,9 @@ This project was created to analyze the LPZRobots C++ codebase and visualize the
    - `cppcheck-dashboard-generator/src/styles.ts` - Dashboard styles
 
 2. **Python Scripts (COMPLETE) ✅**
-   - `generate/generate-standalone-virtual-dashboard.py` - Best for large datasets
-   - `generate/generate-ultimate-dashboard.py` - Recommended for most cases
-   - `add-code-context.py` - Adds code snippets to JSON
+   - `generate/generate-standalone-virtual-dashboard.py` - Best for most cases
+   - `generate/generate-production-dashboard.py` - Minimal size
+   - `utils/add-code-context.py` - Adds code snippets to JSON
 
 3. **Documentation (UPDATED)**
    - `PROJECT_UNIFIED_DOCUMENTATION.md` - Complete guide to both implementations
@@ -372,17 +370,17 @@ This project was created to analyze the LPZRobots C++ codebase and visualize the
 
 ### Working Commands (Python)
 ```bash
-# Generate ultimate dashboard (recommended)
-python3 generate-ultimate-dashboard.py analysis.json dashboard.html
+# Generate dashboard (recommended)
+python3 generate/generate-standalone-virtual-dashboard.py analysis.json dashboard.html
 
 # Add code context to analysis
-python3 add-code-context.py analysis.json analysis-with-context.json
+python3 utils/add-code-context.py analysis.json analysis-with-context.json
 
-# Generate virtual scroll dashboard (for large datasets)
-python3 generate-virtual-scroll-dashboard.py analysis.json virtual.html
+# Generate virtual scroll dashboard (for huge datasets)
+python3 generate/generate-virtual-scroll-dashboard.py analysis.json virtual.html
 
 # Generate minimal dashboard (no code context)
-python3 generate-production-dashboard.py analysis.json minimal.html
+python3 generate/generate-production-dashboard.py analysis.json minimal.html
 ```
 
 ### File Locations
@@ -408,7 +406,7 @@ tools/cppcheck/cppcheck cpp17 --format json > analysis.json
 
 # Generate new dashboard
 cd cppcheck-studio
-python3 generate-ultimate-dashboard.py ../analysis.json new-dashboard.html
+python3 generate/generate-standalone-virtual-dashboard.py ../analysis.json new-dashboard.html
 ```
 
 ## 📚 Summary - COMPLETELY UPDATED

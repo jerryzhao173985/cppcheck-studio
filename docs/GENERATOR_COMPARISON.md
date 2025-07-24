@@ -16,38 +16,45 @@
 
 ## Complete Generator Comparison Table
 
+### Active Generators (in `generate/` directory)
+
 | Generator | File Size | Features | Best For | Issues Handled |
 |-----------|-----------|----------|----------|----------------|
-| **generate-standalone-virtual-dashboard.py** | ~240KB | Virtual scroll, search, filters, code preview | **RECOMMENDED - Most use cases** | 100,000+ |
+| **generate-standalone-virtual-dashboard.py** ⭐ | ~240KB | Virtual scroll, search, filters, code preview | **RECOMMENDED - Most use cases** | 100,000+ |
 | **generate-virtual-scroll-dashboard.py** | ~220KB | Virtual scrolling focus | Very large datasets | 100,000+ |
-| **generate-ultimate-dashboard.py** | ~240KB | All features, proven stable | Production use | 10,000 |
-| **generate-optimized-dashboard.py** | ~200KB | Performance optimized | Fast loading | 10,000 |
 | **generate-production-dashboard.py** | ~150KB | Minimal, no code context | Quick overview | 5,000 |
-| **generate-simple-dashboard.py** | ~180KB | Basic features | Simple needs | 5,000 |
-| **generate-robust-dashboard.py** | ~250KB | Error handling, progress | Unreliable data | 10,000 |
 | **generate-split-dashboard.py** | Multiple files | Separates data/UI | Modular needs | 10,000 |
-| **generate-enhanced-dashboard.py** | ~260KB | Extra visualizations | Analytics | 10,000 |
-| **generate-modern-dashboard.py** | ~230KB | Modern UI | Better UX | 10,000 |
-| **generate-dashboard-v2.py** | ~220KB | Version 2 features | Legacy | 5,000 |
-| **generate-dashboard-v3.py** | ~210KB | Version 3 features | Legacy | 5,000 |
-| **generate-paginated-dashboard.py** | ~190KB | Page-based navigation | No JS environments | 1,000 |
-| **generate-streaming-dashboard.py** | Varies | Loads progressively | Slow connections | Unlimited |
-| **generate-interactive-dashboard.py** | ~270KB | Maximum interactivity | Power users | 10,000 |
-| **generate-compact-dashboard.py** | ~140KB | Minimal size | Embedded use | 1,000 |
-| **generate-detailed-dashboard.py** | ~300KB | Maximum detail | Deep analysis | 5,000 |
-| **generate-summary-dashboard.py** | ~100KB | Overview only | Quick reports | 500 |
+| **generate-optimized-dashboard.py** | ~200KB | Performance optimized | GitHub Actions workflows | 10,000 |
+| **generate-simple-dashboard.py** | ~180KB | Basic features | Workflow fallback | 5,000 |
 
-## Feature Matrix
+### Legacy Generators (moved to `legacy/generators/`)
 
-| Feature | Standalone Virtual | Virtual Scroll | Ultimate | Optimized | Production |
-|---------|-------------------|----------------|----------|-----------|------------|
-| Virtual Scrolling | ✅ | ✅ | ❌ | ❌ | ❌ |
-| Code Context | ✅ | ✅ | ✅ | ✅ | ❌ |
+⚠️ **Note**: The following generators have been moved to the legacy directory and are no longer actively maintained:
+
+| Generator | Previous Features | Replacement |
+|-----------|------------------|-------------|
+| **generate-ultimate-dashboard.py** | All features, proven stable | Use `generate-standalone-virtual-dashboard.py` |
+| **generate-robust-dashboard.py** | Error handling, progress | Features merged into standalone version |
+| **generate-enhanced-dashboard.py** | Extra visualizations | Use standalone version |
+| **generate-modern-dashboard.py** | Modern UI | UI improvements in standalone |
+| **generate-paginated-dashboard.py** | Page-based navigation | Virtual scrolling is superior |
+| **generate-streaming-dashboard.py** | Loads progressively | Not needed with virtual scrolling |
+| **generate-interactive-dashboard.py** | Maximum interactivity | All features in standalone |
+| **generate-compact-dashboard.py** | Minimal size | Use `generate-production-dashboard.py` |
+| **generate-detailed-dashboard.py** | Maximum detail | Use standalone with code context |
+| **generate-summary-dashboard.py** | Overview only | Use production version |
+
+## Feature Matrix (Active Generators Only)
+
+| Feature | Standalone Virtual | Virtual Scroll | Production | Split | Optimized |
+|---------|-------------------|----------------|------------|-------|----------||
+| Virtual Scrolling | ✅ | ✅ | ❌ | ❌ | ✅ |
+| Code Context | ✅ | ✅ | ❌ | ✅ | ✅ |
 | Search | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Filters | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Inline Data | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Progress Bar | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Error Recovery | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Inline Data | ✅ | ✅ | ✅ | ❌ | ✅ |
+| Separate Files | ❌ | ❌ | ❌ | ✅ | ❌ |
+| Error Recovery | ✅ | ✅ | ❌ | ✅ | ✅ |
 | Mobile Friendly | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ## Usage Examples
@@ -81,12 +88,12 @@ await generator.generate('analysis.json', 'dashboard.html', {
 
 ## Performance Benchmarks
 
-| Issues | Standalone Virtual | Ultimate | Production | TypeScript |
-|--------|--------------------|----------|------------|------------|
+| Issues | Standalone Virtual | Virtual Scroll | Production | TypeScript |
+|--------|--------------------|----------------|------------|------------|
 | 100 | <0.1s | <0.1s | <0.1s | <0.1s |
-| 1,000 | 0.2s | 0.3s | 0.1s | 0.2s |
-| 10,000 | 0.8s | 2.5s | 0.5s | 0.7s |
-| 100,000 | 3.2s | ❌ OOM | 2.8s | 3.0s |
+| 1,000 | 0.2s | 0.2s | 0.1s | 0.2s |
+| 10,000 | 0.8s | 0.7s | 0.5s | 0.7s |
+| 100,000 | 3.2s | 3.0s | 2.8s | 3.0s |
 
 ## Recommendations
 
@@ -107,7 +114,16 @@ await generator.generate('analysis.json', 'dashboard.html', {
 
 ## Migration Guide
 
-If you're currently using an older generator, migrate to:
-- `generate-dashboard.py` → `generate-ultimate-dashboard.py`
-- `generate-dashboard-v2.py` → `generate-standalone-virtual-dashboard.py`
-- `generate-simple-dashboard.py` → `generate-production-dashboard.py`
+If you're currently using a legacy generator, here's the recommended migration:
+
+| Old Generator (in legacy/) | → | New Generator (in generate/) |
+|---------------------------|---|-----------------------------|
+| Any legacy generator | → | **`generate-standalone-virtual-dashboard.py`** (RECOMMENDED) |
+| Need minimal output | → | `generate-production-dashboard.py` |
+| Need huge dataset support | → | `generate-virtual-scroll-dashboard.py` |
+| Need modular output | → | `generate-split-dashboard.py` |
+
+**Important Notes**:
+- All legacy generators are in `legacy/generators/` and are not actively maintained
+- The `generate-optimized-dashboard.py` and `generate-simple-dashboard.py` in `generate/` are kept only for GitHub Actions compatibility
+- For all new projects, use `generate-standalone-virtual-dashboard.py`
