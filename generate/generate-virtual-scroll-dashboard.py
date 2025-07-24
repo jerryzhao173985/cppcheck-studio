@@ -670,7 +670,7 @@ class VirtualScrollDashboardGenerator:
             color: #2d3748;
             line-height: 1.6;
             overflow: hidden;
-            font-size: 16px; /* Base font size for consistent rem/em calculations */
+            font-size: 16px;
         }
         
         .container {
@@ -816,7 +816,7 @@ class VirtualScrollDashboardGenerator:
             padding: 10px 15px 10px 40px;
             border: 1px solid #e2e8f0;
             border-radius: 6px;
-            font-size: 0.85em; /* Consistent with table font size */
+            font-size: 0.85em;
             transition: border-color 0.2s;
         }
         
@@ -954,7 +954,7 @@ class VirtualScrollDashboardGenerator:
         
         .issue-row td {
             padding: 0 15px;
-            font-size: 0.85em; /* Reduced from 0.95em to match header size */
+            font-size: 0.85em;
             height: 50px;
             vertical-align: middle;
             overflow: hidden;
@@ -1182,7 +1182,7 @@ class VirtualScrollDashboardGenerator:
             border: 1px solid #e2e8f0;
             border-radius: 8px;
             padding: 15px;
-            font-size: 0.85em; /* Consistent with table font size */
+            font-size: 0.85em;
             line-height: 1.6;
         }
         
@@ -1257,11 +1257,15 @@ class VirtualScrollDashboardGenerator:
         /* Responsive design */
         @media (max-width: 768px) {
             body {
+<<<<<<< HEAD
                 font-size: 14px; /* Smaller base font on mobile */
             }
             
             .header h1 {
                 font-size: 1.5em; /* Smaller header on mobile */
+=======
+                font-size: 14px;
+>>>>>>> 7b24901 (Complete font size consistency fixes across all HTML generators)
             }
             
             .header-content {
@@ -1276,98 +1280,23 @@ class VirtualScrollDashboardGenerator:
             
             .stats-grid {
                 grid-template-columns: 1fr 1fr;
-                padding: 10px;
-            }
-            
-            .stat-card {
-                padding: 15px;
             }
             
             .stat-card .value {
-                font-size: 1.5em; /* Smaller stat values on mobile */
+                font-size: 1.5em;
             }
             
-            .stat-card i {
-                font-size: 1.5em; /* Smaller icons on mobile */
-            }
-            
-            .controls {
+            .issues-table th, .issue-row td {
+                font-size: 0.85em;
                 padding: 10px;
-                margin: 0 10px;
-                gap: 10px;
-            }
-            
-            .search-container {
-                min-width: 100%;
-            }
-            
-            .search-container input {
-                height: 44px; /* Touch target size */
-                font-size: 16px; /* Prevent zoom on iOS */
             }
             
             .filter-buttons {
                 justify-content: center;
-                width: 100%;
-            }
-            
-            .filter-btn {
-                font-size: 0.8em; /* Smaller filter buttons */
-                padding: 10px 12px;
-                min-height: 44px; /* Touch target size */
-            }
-            
-            /* Enable horizontal scroll for table on mobile */
-            .virtual-scroll-container {
-                margin: 0 10px 10px;
-            }
-            
-            .issues-table-wrapper {
-                overflow-x: auto;
-                -webkit-overflow-scrolling: touch;
-            }
-            
-            .issues-table {
-                min-width: 600px; /* Force horizontal scroll */
             }
             
             .col-file { width: 30%; }
             .col-message { width: calc(100% - 30% - 60px - 100px - 80px - 60px - 20px); }
-            
-            .issues-table th,
-            .issues-table td {
-                font-size: 0.85em; /* Maintain table text size */
-                padding: 10px; /* Touch-friendly padding */
-            }
-            
-            .issue-row {
-                min-height: 44px; /* Touch target size */
-            }
-            
-            .severity-badge {
-                font-size: 0.7em; /* Smaller badges on mobile */
-                padding: 3px 8px;
-            }
-            
-            .action-btn {
-                min-width: 44px;
-                min-height: 44px;
-                padding: 10px;
-            }
-            
-            .modal-content {
-                margin: 20px;
-                width: calc(100% - 40px);
-            }
-            
-            .modal-header {
-                padding: 15px;
-            }
-            
-            .close-btn {
-                width: 44px;
-                height: 44px;
-            }
         }
         """
 

@@ -416,7 +416,7 @@ class ProductionDashboardGenerator:
             background: #f5f7fa;
             color: #2d3748;
             line-height: 1.6;
-            font-size: 16px; /* Base font size for consistent rem/em calculations */
+            font-size: 16px;
         }
         
         .container {
@@ -552,7 +552,7 @@ class ProductionDashboardGenerator:
             padding: 10px 15px 10px 40px;
             border: 1px solid #e2e8f0;
             border-radius: 8px;
-            font-size: 0.85em; /* Consistent with table font size */
+            font-size: 0.85em;
             transition: border-color 0.2s;
         }
         
@@ -651,7 +651,7 @@ class ProductionDashboardGenerator:
         
         .issues-table td {
             padding: 15px;
-            font-size: 0.85em; /* Reduced from 0.95em to match header size */
+            font-size: 0.85em;
         }
         
         .file-cell {
@@ -862,7 +862,7 @@ class ProductionDashboardGenerator:
             border: 1px solid #e2e8f0;
             border-radius: 8px;
             padding: 15px;
-            font-size: 0.85em; /* Consistent with table font size */
+            font-size: 0.85em;
             line-height: 1.6;
         }
         
@@ -904,174 +904,37 @@ class ProductionDashboardGenerator:
             font-family: 'Monaco', 'Consolas', monospace;
         }
         
-        /* Mobile Responsive Design */
+        /* Responsive design */
         @media (max-width: 768px) {
-            /* Core font size reduction */
             body {
-                font-size: 14px; /* Reduced from 16px for better content density */
-            }
-            
-            /* Header layout adjustments */
-            .header {
-                padding: 15px 0;
+                font-size: 14px;
             }
             
             .header-content {
-                flex-direction: column; /* Vertical stacking */
+                flex-direction: column;
                 text-align: center;
-                gap: 10px;
-            }
-            
-            .header h1 {
-                font-size: 1.5em;
             }
             
             .header-info {
-                flex-direction: column; /* Vertical stacking */
-                gap: 5px;
-                font-size: 0.8em;
+                flex-wrap: wrap;
+                justify-content: center;
             }
             
-            /* Stats grid adjustments */
             .stats-grid {
-                grid-template-columns: 1fr 1fr; /* 2 columns on mobile */
-                gap: 10px;
-            }
-            
-            .stat-card {
-                padding: 15px;
+                grid-template-columns: 1fr 1fr;
             }
             
             .stat-card .value {
                 font-size: 1.5em;
             }
             
-            .stat-card i {
-                font-size: 1.5em;
-            }
-            
-            /* Controls layout adjustments */
-            .controls {
-                flex-direction: column; /* Vertical stacking */
-                padding: 15px;
-                gap: 15px;
-            }
-            
-            .search-container {
-                min-width: 100%;
-            }
-            
-            .search-container input {
-                padding: 12px 15px 12px 40px;
-                font-size: 16px; /* Prevent iOS zoom */
-                min-height: 44px; /* Touch target */
+            .issues-table th, .issues-table td {
+                font-size: 0.85em;
+                padding: 10px;
             }
             
             .filter-buttons {
-                width: 100%;
                 justify-content: center;
-                flex-wrap: wrap;
-            }
-            
-            .filter-btn {
-                font-size: 0.8em;
-                padding: 10px 15px;
-                min-height: 44px; /* Touch target */
-                margin: 2px;
-            }
-            
-            /* Table adjustments */
-            .issues-container {
-                overflow-x: auto; /* Horizontal scroll */
-                -webkit-overflow-scrolling: touch; /* Smooth scroll on iOS */
-            }
-            
-            .issues-table {
-                min-width: 600px; /* Ensure minimum width */
-            }
-            
-            .issues-table th,
-            .issues-table td {
-                font-size: 0.85em;
-                padding: 10px; /* Reduced from 15px */
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
-            
-            /* Column optimizations for mobile */
-            .col-file { 
-                width: 25%; 
-                max-width: 150px;
-            }
-            
-            .col-line { 
-                width: 10%; 
-                text-align: center;
-            }
-            
-            .col-severity { 
-                width: 15%; 
-            }
-            
-            .col-message { 
-                width: 35%; 
-                max-width: 200px;
-            }
-            
-            .col-id { 
-                width: 10%; 
-            }
-            
-            .col-actions { 
-                width: 5%; 
-                text-align: center;
-            }
-            
-            /* Ensure clickable areas meet touch targets */
-            .issues-table tbody tr {
-                min-height: 44px;
-            }
-            
-            .severity-badge {
-                font-size: 0.7em;
-                padding: 3px 6px;
-            }
-            
-            .action-btn {
-                padding: 10px;
-                min-width: 44px;
-                min-height: 44px;
-            }
-            
-            /* Modal adjustments */
-            .modal-content {
-                margin: 10px;
-                width: calc(100% - 20px);
-                max-height: calc(100vh - 20px);
-            }
-            
-            .modal-header {
-                position: sticky;
-                top: 0;
-                z-index: 100;
-                background: #f7fafc;
-            }
-            
-            .close-btn {
-                min-width: 44px;
-                min-height: 44px;
-            }
-            
-            /* Improve readability */
-            .message-box {
-                font-size: 0.9em;
-                line-height: 1.5;
-            }
-            
-            .info-table td {
-                padding: 8px 12px;
-                font-size: 0.85em;
             }
         }
         """
