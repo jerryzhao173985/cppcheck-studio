@@ -489,7 +489,7 @@ class ProductionDashboardGenerator:
         }
         
         .stat-card i {
-            font-size: 2.5em;
+            font-size: 2em;
             margin-bottom: 10px;
             opacity: 0.8;
         }
@@ -503,7 +503,7 @@ class ProductionDashboardGenerator:
         }
         
         .stat-card .value {
-            font-size: 2.5em;
+            font-size: 2em;
             font-weight: 700;
             margin-bottom: 5px;
         }

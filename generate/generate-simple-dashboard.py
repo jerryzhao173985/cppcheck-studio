@@ -593,7 +593,7 @@ class SimpleDashboardGenerator:
             padding: 12px 15px 12px 45px;
             border: 1px solid #ddd;
             border-radius: 8px;
-            font-size: 14px;
+            font-size: 0.875em;
             transition: border-color 0.2s;
         }
         
@@ -615,7 +615,7 @@ class SimpleDashboardGenerator:
             border-radius: 8px;
             cursor: pointer;
             transition: all 0.2s;
-            font-size: 14px;
+            font-size: 0.875em;
             font-weight: 500;
         }
         
@@ -642,7 +642,7 @@ class SimpleDashboardGenerator:
             padding: 10px 0;
             margin-bottom: 10px;
             color: #7f8c8d;
-            font-size: 14px;
+            font-size: 0.875em;
         }
         
         /* Table */
@@ -685,7 +685,7 @@ class SimpleDashboardGenerator:
         
         .issue-row td {
             padding: 15px;
-            font-size: 14px;
+            font-size: 0.875em;
         }
         
         .indicator-cell {
@@ -720,7 +720,7 @@ class SimpleDashboardGenerator:
         .severity-badge {
             padding: 4px 12px;
             border-radius: 20px;
-            font-size: 12px;
+            font-size: 0.75em;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -753,7 +753,7 @@ class SimpleDashboardGenerator:
         
         .id-cell {
             font-family: 'Monaco', 'Consolas', monospace;
-            font-size: 12px;
+            font-size: 0.75em;
             color: #7f8c8d;
         }
         
@@ -764,7 +764,7 @@ class SimpleDashboardGenerator:
             padding: 8px 16px;
             border-radius: 6px;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 0.75em;
             transition: background-color 0.2s;
         }
         
@@ -821,7 +821,7 @@ class SimpleDashboardGenerator:
         .close-btn {
             background: none;
             border: none;
-            font-size: 24px;
+            font-size: 1.5em;
             cursor: pointer;
             color: #adb5bd;
             transition: color 0.2s;
@@ -861,7 +861,7 @@ class SimpleDashboardGenerator:
             border-radius: 8px;
             margin-bottom: 30px;
             font-family: 'Monaco', 'Consolas', monospace;
-            font-size: 14px;
+            font-size: 0.875em;
         }
         
         .code-preview {

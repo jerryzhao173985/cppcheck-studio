@@ -244,7 +244,7 @@ class OptimizedDashboardGenerator:
         }}
         
         .title {{
-            font-size: 1.5rem;
+            font-size: 1.5em;
             font-weight: 600;
             display: flex;
             align-items: center;
@@ -264,7 +264,7 @@ class OptimizedDashboardGenerator:
             gap: 0.25rem;
             padding: 0.25rem 0.75rem;
             border-radius: 1rem;
-            font-size: 0.875rem;
+            font-size: 0.875em;
             font-weight: 500;
             cursor: pointer;
             transition: transform 0.2s;
@@ -336,7 +336,7 @@ class OptimizedDashboardGenerator:
             border-radius: 0.5rem;
             background: var(--bg-primary);
             color: var(--text-primary);
-            font-size: 0.875rem;
+            font-size: 0.875em;
         }}
         
         .search-input:focus {{
@@ -350,7 +350,7 @@ class OptimizedDashboardGenerator:
             right: 0.75rem;
             top: 50%;
             transform: translateY(-50%);
-            font-size: 0.75rem;
+            font-size: 0.75em;
             color: var(--text-secondary);
         }}
         
@@ -365,7 +365,7 @@ class OptimizedDashboardGenerator:
             border-radius: 0.5rem;
             background: var(--bg-primary);
             color: var(--text-primary);
-            font-size: 0.875rem;
+            font-size: 0.875em;
             cursor: pointer;
             transition: all 0.2s;
         }}
@@ -401,7 +401,7 @@ class OptimizedDashboardGenerator:
             display: flex;
             justify-content: space-between;
             margin-bottom: 0.5rem;
-            font-size: 0.875rem;
+            font-size: 0.875em;
         }}
         
         .progress-bar {{
@@ -454,11 +454,11 @@ class OptimizedDashboardGenerator:
         .file-name {{
             font-weight: 500;
             font-family: var(--font-mono);
-            font-size: 0.875rem;
+            font-size: 0.875em;
         }}
         
         .issue-count {{
-            font-size: 0.75rem;
+            font-size: 0.75em;
             color: var(--text-secondary);
         }}
         
@@ -480,7 +480,7 @@ class OptimizedDashboardGenerator:
         .severity-dot.information {{ background: var(--info-color); }}
         
         .file-toggle {{
-            font-size: 0.75rem;
+            font-size: 0.75em;
             color: var(--text-secondary);
         }}
         
@@ -522,7 +522,7 @@ class OptimizedDashboardGenerator:
             flex-shrink: 0;
             padding: 0.125rem 0.5rem;
             border-radius: 0.25rem;
-            font-size: 0.75rem;
+            font-size: 0.75em;
             font-weight: 500;
         }}
         
@@ -532,13 +532,13 @@ class OptimizedDashboardGenerator:
         }}
         
         .issue-message {{
-            font-size: 0.875rem;
+            font-size: 0.875em;
             margin-bottom: 0.25rem;
         }}
         
         .issue-code {{
             font-family: var(--font-mono);
-            font-size: 0.8rem;
+            font-size: 0.8em;
             background: var(--bg-tertiary);
             padding: 0.25rem 0.5rem;
             border-radius: 0.25rem;
@@ -550,7 +550,7 @@ class OptimizedDashboardGenerator:
         .issue-meta {{
             display: flex;
             gap: 1rem;
-            font-size: 0.75rem;
+            font-size: 0.75em;
             color: var(--text-secondary);
         }}
         
@@ -566,7 +566,7 @@ class OptimizedDashboardGenerator:
             border-radius: 0.25rem;
             background: var(--bg-primary);
             color: var(--text-primary);
-            font-size: 0.75rem;
+            font-size: 0.75em;
             cursor: pointer;
             transition: all 0.2s;
         }}
@@ -631,14 +631,14 @@ class OptimizedDashboardGenerator:
         }}
         
         .modal-title {{
-            font-size: 1.125rem;
+            font-size: 1.125em;
             font-weight: 600;
         }}
         
         .modal-close {{
             background: none;
             border: none;
-            font-size: 1.5rem;
+            font-size: 1.5em;
             cursor: pointer;
             color: var(--text-secondary);
             padding: 0;
@@ -677,7 +677,7 @@ class OptimizedDashboardGenerator:
         
         .detail-section h4 {{
             margin: 0 0 0.75rem 0;
-            font-size: 1rem;
+            font-size: 1em;
             color: var(--text-primary);
         }}
         
@@ -686,7 +686,7 @@ class OptimizedDashboardGenerator:
             border-radius: 0.5rem;
             overflow: hidden;
             font-family: var(--font-mono);
-            font-size: 0.875rem;
+            font-size: 0.875em;
         }}
         
         .code-line {{
@@ -771,7 +771,7 @@ class OptimizedDashboardGenerator:
         }}
         
         .empty-state h2 {{
-            font-size: 1.5rem;
+            font-size: 1.5em;
             margin-bottom: 0.5rem;
         }}
         
@@ -823,10 +823,10 @@ class OptimizedDashboardGenerator:
                     <span>Code Analysis Dashboard</span>
                 </h1>
                 <div style="display: flex; gap: 1rem; align-items: center;">
-                    <a href="../../gallery.html" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.1); border-radius: 0.5rem; color: var(--text-primary); text-decoration: none; font-size: 0.875rem; transition: all 0.2s;">
+                    <a href="../../gallery.html" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.1); border-radius: 0.5rem; color: var(--text-primary); text-decoration: none; font-size: 0.875em; transition: all 0.2s;">
                         ← Back to Gallery
                     </a>
-                    <a href="../../index.html" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.1); border-radius: 0.5rem; color: var(--text-primary); text-decoration: none; font-size: 0.875rem; transition: all 0.2s;">
+                    <a href="../../index.html" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.1); border-radius: 0.5rem; color: var(--text-primary); text-decoration: none; font-size: 0.875em; transition: all 0.2s;">
                         🏠 Home
                     </a>
                 </div>
