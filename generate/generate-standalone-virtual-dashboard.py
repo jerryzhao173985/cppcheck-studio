@@ -1031,7 +1031,7 @@ class StandaloneVirtualDashboardGenerator:
         
         .issue-row td {
             padding: 0 15px;
-            font-size: 0.95em;
+            font-size: 0.85em;
             height: 50px;
             vertical-align: middle;
             overflow: hidden;
@@ -1054,7 +1054,7 @@ class StandaloneVirtualDashboardGenerator:
         
         .file-cell {
             font-family: 'Monaco', 'Consolas', monospace;
-            font-size: 0.9em;
+            font-size: 0.85em;
             color: #4a5568;
         }
         
@@ -1082,7 +1082,7 @@ class StandaloneVirtualDashboardGenerator:
             display: inline-block;
             padding: 4px 10px;
             border-radius: 4px;
-            font-size: 0.75em;
+            font-size: 0.85em;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -1124,7 +1124,7 @@ class StandaloneVirtualDashboardGenerator:
             background: white;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 0.9em;
+            font-size: 0.85em;
             transition: all 0.2s;
             color: #4a5568;
         }

@@ -295,7 +295,7 @@ export function generateStyles(): string {
     
     .issue-row td {
         padding: 0 15px;
-        font-size: 0.95em;
+        font-size: 0.85em;
         height: 50px;
         vertical-align: middle;
         overflow: hidden;
@@ -318,7 +318,7 @@ export function generateStyles(): string {
     
     .file-cell {
         font-family: 'Monaco', 'Consolas', monospace;
-        font-size: 0.9em;
+        font-size: 0.85em;
         color: #4a5568;
     }
     

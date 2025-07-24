@@ -821,12 +821,12 @@ class SplitDashboardGenerator:
         
         .issues-table td {
             padding: 15px;
-            font-size: 0.95em;
+            font-size: 0.85em;
         }
         
         .file-cell {
             font-family: 'Monaco', 'Consolas', monospace;
-            font-size: 0.9em;
+            font-size: 0.85em;
             color: #4a5568;
             overflow: hidden;
             text-overflow: ellipsis;

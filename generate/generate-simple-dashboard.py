@@ -685,7 +685,7 @@ class SimpleDashboardGenerator:
         
         .issue-row td {
             padding: 15px;
-            font-size: 14px;
+            font-size: 12px;
         }
         
         .indicator-cell {
