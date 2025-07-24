@@ -821,7 +821,7 @@ class SplitDashboardGenerator:
         
         .issues-table td {
             padding: 15px;
-            font-size: 0.95em;
+            font-size: 0.85em;
         }
         
         .file-cell {
