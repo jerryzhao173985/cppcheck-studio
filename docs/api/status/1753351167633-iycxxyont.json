@@ -1,17 +1,28 @@
 {
   "analysis_id": "1753351167633-iycxxyont",
   "repository": "jerryzhao173985/lpz",
-  "status": "running",
-  "step": "processing",
+  "status": "completed",
+  "step": "completed",
   "workflow_run_id": "16493808213",
   "workflow_run_url": "https://github.com/jerryzhao173985/cppcheck-studio/actions/runs/16493808213",
-  "updated_at": "2025-07-24T10:00:51Z",
-  "message": "Analysis complete: found 2702 issues in 1603 files",
+  "completed_at": "2025-07-24T10:00:59Z",
+  "files_analyzed": 1603,
+  "filesAnalyzed": 1603,
+  "issues_found": 2702,
+  "issues": {
+    "total": 2702,
+    "error": 77,
+    "warning": 212,
+    "style": 1501,
+    "performance": 119,
+    "portability": 8,
+    "information": 785
+  },
+  "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/1753351167633-iycxxyont/index.html",
+  "dashboardUrl": "https://jerryzhao173985.github.io/cppcheck-studio/results/1753351167633-iycxxyont/index.html",
   "progress": {
-    "steps_completed": 3,
+    "steps_completed": 5,
     "total_steps": 5,
-    "current_step": "processing",
-    "files_found": 1603,
-    "issues_found": 2702
+    "current_step": "completed"
   }
 }
