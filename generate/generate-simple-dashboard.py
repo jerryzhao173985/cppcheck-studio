@@ -822,7 +822,7 @@ class SimpleDashboardGenerator:
         .close-btn {
             background: none;
             border: none;
-            font-size: 24px;
+            font-size: 1.5em;
             cursor: pointer;
             color: #adb5bd;
             transition: color 0.2s;
