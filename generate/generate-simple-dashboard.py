@@ -504,7 +504,7 @@ class SimpleDashboardGenerator:
         .header-info {
             display: flex;
             gap: 30px;
-            font-size: 0.95em;
+            font-size: 0.85em;
             opacity: 0.9;
         }
         
@@ -668,7 +668,7 @@ class SimpleDashboardGenerator:
             padding: 15px;
             text-align: left;
             font-weight: 600;
-            font-size: 0.9em;
+            font-size: 0.85em;
             color: #495057;
             text-transform: uppercase;
             letter-spacing: 0.5px;
