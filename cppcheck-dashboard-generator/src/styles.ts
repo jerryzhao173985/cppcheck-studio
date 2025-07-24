@@ -295,7 +295,7 @@ export function generateStyles(): string {
     
     .issue-row td {
         padding: 0 15px;
-        font-size: 0.95em;
+        font-size: 0.85em;
         height: 50px;
         vertical-align: middle;
         overflow: hidden;
