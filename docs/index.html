@@ -824,9 +824,17 @@
                 }
             });
             
-            // Update progress bar
+            // Update progress bar - use fractional progress if available
             const progress = document.getElementById('timelineProgress');
-            const progressWidth = (currentIndex / (steps.length - 1)) * 100;
+            let progressWidth = (currentIndex / (steps.length - 1)) * 100;
+            
+            // If we have fractional progress from the backend, use it
+            if (window.currentAnalysisData && window.currentAnalysisData.progress && 
+                window.currentAnalysisData.progress.steps_completed) {
+                const fractionalProgress = window.currentAnalysisData.progress.steps_completed;
+                progressWidth = (fractionalProgress / 5) * 100;
+            }
+            
             progress.style.width = `${progressWidth}%`;
             
             // Update message
@@ -859,6 +867,9 @@
                         const data = statusCheck.data;
                         
                         if (statusCheck.status === 'running') {
+                            // Store current analysis data for progress bar
+                            window.currentAnalysisData = data;
+                            
                             // Check detailed step information
                             const step = data.step || 'running';
                             const progress = data.progress || {};
@@ -879,8 +890,19 @@
                                     timelineStep = 'running';
                                     if (progress.files_found) {
                                         message = `${data.message}<br>` +
-                                                `📁 Files: ${progress.files_found}<br>` +
-                                                `🕐 Elapsed: ${elapsedStr}`;
+                                                `📁 Files: ${progress.files_found}`;
+                                        
+                                        // Add detailed progress if available
+                                        if (progress.current_file && progress.percentage) {
+                                            message += `<br>📊 Progress: ${progress.current_file}/${progress.files_found} (${progress.percentage}%)`;
+                                        }
+                                        
+                                        // Add ETA if available
+                                        if (progress.estimated_remaining) {
+                                            message += `<br>⏱️ ETA: ${progress.estimated_remaining}`;
+                                        }
+                                        
+                                        message += `<br>🕐 Elapsed: ${elapsedStr}`;
                                     }
                                     break;
                                     
@@ -909,7 +931,13 @@
                             // Update progress bar if we have step information
                             if (progress.steps_completed && progress.total_steps) {
                                 const percent = Math.round((progress.steps_completed / progress.total_steps) * 100);
-                                showStatus('info', `🔄 Analysis ${percent}% complete... (${elapsedStr} elapsed)`);
+                                
+                                // More detailed status message during analysis
+                                if (step === 'analyzing' && progress.percentage) {
+                                    showStatus('info', `🔄 Analyzing files: ${progress.percentage}% complete... (${elapsedStr} elapsed)`);
+                                } else {
+                                    showStatus('info', `🔄 Analysis ${percent}% complete... (${elapsedStr} elapsed)`);
+                                }
                             } else {
                                 showStatus('info', `🔄 Analysis in progress... (${elapsedStr} elapsed)`);
                             }

@@ -285,12 +285,34 @@ jobs:
         update_analysis_status "running" "Found ${FILE_COUNT} C++ files, starting static analysis..." "analyzing"
         
         # Run cppcheck from inside target-repo to get clean paths
-        echo "🔍 Running cppcheck analysis..."
+        echo "🔍 Running cppcheck analysis with progress monitoring..."
         cd target-repo
         
         # Create a new file list with relative paths (removing target-repo/ prefix)
         sed 's|^target-repo/||' ../cpp_files.txt > cpp_files_relative.txt
         
+        # Start progress monitor in background if available
+        MONITOR_PID=""
+        if [ -f ../cppcheck-studio/scripts/monitor-cppcheck-progress.sh ]; then
+          echo "📊 Starting progress monitor..."
+          # Export variables for monitor script
+          export ANALYSIS_ID="${ANALYSIS_ID}"
+          export REPO="${REPO}"
+          export WORKFLOW_RUN_ID="${{ github.run_id }}"
+          export WORKFLOW_RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          export FILE_COUNT="${FILE_COUNT}"
+          
+          # Start monitor in background
+          ../cppcheck-studio/scripts/monitor-cppcheck-progress.sh ../cppcheck.log ../monitor.pid &
+          MONITOR_PID=$!
+          echo "📊 Monitor started with PID: $MONITOR_PID"
+        fi
+        
+        # Run cppcheck with output capture for progress monitoring
+        echo "🔍 Starting analysis of ${FILE_COUNT} files..."
+        
+        # Run cppcheck - XML goes to file, progress to stdout
+        # When using --xml, cppcheck sends XML to stderr
         cppcheck \
           --enable=all \
           --inconclusive \
@@ -300,9 +322,28 @@ jobs:
           --xml-version=2 \
           --file-list=cpp_files_relative.txt \
           -j $(nproc) \
-          2> ../cppcheck-results.xml || {
+          2> ../cppcheck-results.xml | tee ../cppcheck.log || {
           echo "⚠️ CPPCheck returned non-zero exit code (this is normal if issues were found)"
         }
+        
+        # Show analysis summary
+        echo "📊 Analysis complete."
+        if [ -f ../cppcheck.log ]; then
+          echo "Progress messages captured: $(grep -c "Checking " ../cppcheck.log 2>/dev/null || echo "0")"
+        fi
+        
+        # Signal monitor to stop
+        if [ -n "$MONITOR_PID" ]; then
+          echo "📊 Stopping progress monitor..."
+          touch ../cppcheck.log.done
+          # Give monitor time to finish
+          sleep 2
+          # Kill if still running
+          if kill -0 $MONITOR_PID 2>/dev/null; then
+            kill $MONITOR_PID 2>/dev/null || true
+          fi
+          rm -f ../monitor.pid ../cppcheck.log.done
+        fi
         
         cd ..
         
@@ -444,43 +485,77 @@ jobs:
       if: github.ref == 'refs/heads/main'
       run: |
         set -euo pipefail
-        # Clone the repo with authentication  
-        git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git status-repo
-        cd status-repo
+        # Function to push status updates
+        push_status_update() {
+          # Clone the repo with authentication  
+          git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git status-repo-tmp
+          cd status-repo-tmp
+          
+          # Create status directory
+          mkdir -p docs/api/status
+          
+          # Copy latest status if it exists
+          if [ -f "$GITHUB_WORKSPACE/status_updates/current_status.json" ]; then
+            cp "$GITHUB_WORKSPACE/status_updates/current_status.json" docs/api/status/${ANALYSIS_ID}.json
+          else
+            # Fallback status
+            printf '%s\n' \
+              '{' \
+              '  "analysis_id": "'"${ANALYSIS_ID}"'",' \
+              '  "repository": "'"${REPO}"'",' \
+              '  "status": "running",' \
+              '  "workflow_run_id": "'"${{ github.run_id }}"'",' \
+              '  "workflow_run_url": "'"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"'",' \
+              '  "updated_at": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'",' \
+              '  "message": "Processing analysis...",' \
+              '  "progress": {' \
+              '    "steps_completed": 3,' \
+              '    "total_steps": 5,' \
+              '    "current_step": "processing"' \
+              '  }' \
+              '}' > docs/api/status/${ANALYSIS_ID}.json
+          fi
+          
+          # Commit and push status update
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add docs/api/status/
+          git commit -m "Update analysis status for ${REPO} (#${ANALYSIS_ID})" || echo "No changes"
+          git push || echo "Push failed, likely concurrent update"
+          
+          cd ..
+          rm -rf status-repo-tmp
+        }
         
-        # Create status directory
-        mkdir -p docs/api/status
+        # Run status update in background and continue
+        push_status_update &
         
-        # Copy latest status if it exists
-        if [ -f "$GITHUB_WORKSPACE/status_updates/current_status.json" ]; then
-          cp "$GITHUB_WORKSPACE/status_updates/current_status.json" docs/api/status/${ANALYSIS_ID}.json
-        else
-          # Fallback status
-          printf '%s\n' \
-            '{' \
-            '  "analysis_id": "'"${ANALYSIS_ID}"'",' \
-            '  "repository": "'"${REPO}"'",' \
-            '  "status": "running",' \
-            '  "workflow_run_id": "'"${{ github.run_id }}"'",' \
-            '  "workflow_run_url": "'"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"'",' \
-            '  "updated_at": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'",' \
-            '  "message": "Processing analysis...",' \
-            '  "progress": {' \
-            '    "steps_completed": 3,' \
-            '    "total_steps": 5,' \
-            '    "current_step": "processing"' \
-            '  }' \
-            '}' > docs/api/status/${ANALYSIS_ID}.json
-        fi
-        
-        # Commit and push status update
-        git config user.name "GitHub Actions"
-        git config user.email "actions@github.com"
-        git add docs/api/status/
-        git commit -m "Update analysis status for ${REPO} (#${ANALYSIS_ID})" || echo "No changes"
-        git push || echo "Push failed, likely concurrent update"
-        
-        cd ..
+        # Also schedule periodic updates during analysis
+        # This will push any status updates created by the monitor script
+        UPDATE_PID_FILE="$GITHUB_WORKSPACE/status_updates/update.pid"
+        (
+          echo $$ > "$UPDATE_PID_FILE"
+          for i in {1..10}; do
+            # Check if we should stop
+            if [ -f "$GITHUB_WORKSPACE/status_updates/stop_updates" ]; then
+              echo "📊 Stopping periodic updates (stop signal received)"
+              break
+            fi
+            
+            sleep 30  # Wait 30 seconds between updates
+            
+            # Check again after sleep
+            if [ -f "$GITHUB_WORKSPACE/status_updates/stop_updates" ]; then
+              break
+            fi
+            
+            if [ -f "$GITHUB_WORKSPACE/status_updates/current_status.json" ]; then
+              echo "📊 Pushing periodic status update ${i}/10..."
+              push_status_update || true
+            fi
+          done
+          rm -f "$UPDATE_PID_FILE"
+        ) &
         
     - name: Generate dashboard
       run: |
@@ -627,6 +702,8 @@ jobs:
         
         # Get issue breakdown
         if [ -f cppcheck-studio/scripts/extract-issue-breakdown.py ]; then
+          # Export ISSUE_COUNT so the script can use it as fallback
+          export ISSUE_COUNT="${ISSUE_COUNT}"
           ISSUE_BREAKDOWN=$(python3 cppcheck-studio/scripts/extract-issue-breakdown.py analysis.json || echo '{"total":0,"error":0,"warning":0,"style":0,"performance":0,"portability":0,"information":0}')
         else
           echo "⚠️ extract-issue-breakdown.py not found, using default breakdown"
@@ -683,6 +760,9 @@ jobs:
       if: github.ref == 'refs/heads/main'
       run: |
         set -euo pipefail
+        # Stop periodic updates since we're at the final step
+        touch "$GITHUB_WORKSPACE/status_updates/stop_updates"
+        
         # Ensure we're in the correct directory
         cd ${WORK_DIR}
         
