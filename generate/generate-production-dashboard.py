@@ -416,6 +416,7 @@ class ProductionDashboardGenerator:
             background: #f5f7fa;
             color: #2d3748;
             line-height: 1.6;
+            font-size: 16px;
         }
         
         .container {
@@ -489,7 +490,7 @@ class ProductionDashboardGenerator:
         }
         
         .stat-card i {
-            font-size: 2.5em;
+            font-size: 2em;
             margin-bottom: 10px;
             opacity: 0.8;
         }
@@ -503,7 +504,7 @@ class ProductionDashboardGenerator:
         }
         
         .stat-card .value {
-            font-size: 2.5em;
+            font-size: 2em;
             font-weight: 700;
             margin-bottom: 5px;
         }
@@ -551,7 +552,7 @@ class ProductionDashboardGenerator:
             padding: 10px 15px 10px 40px;
             border: 1px solid #e2e8f0;
             border-radius: 8px;
-            font-size: 0.95em;
+            font-size: 0.85em;
             transition: border-color 0.2s;
         }
         
@@ -650,7 +651,7 @@ class ProductionDashboardGenerator:
         
         .issues-table td {
             padding: 15px;
-            font-size: 0.95em;
+            font-size: 0.85em;
         }
         
         .file-cell {
@@ -861,7 +862,7 @@ class ProductionDashboardGenerator:
             border: 1px solid #e2e8f0;
             border-radius: 8px;
             padding: 15px;
-            font-size: 0.95em;
+            font-size: 0.85em;
             line-height: 1.6;
         }
         
@@ -901,6 +902,40 @@ class ProductionDashboardGenerator:
         
         .no-code-message code {
             font-family: 'Monaco', 'Consolas', monospace;
+        }
+        
+        /* Responsive design */
+        @media (max-width: 768px) {
+            body {
+                font-size: 14px;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .header-info {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+            
+            .stat-card .value {
+                font-size: 1.5em;
+            }
+            
+            .issues-table th, .issues-table td {
+                font-size: 0.85em;
+                padding: 10px;
+            }
+            
+            .filter-buttons {
+                justify-content: center;
+            }
         }
         """
 
