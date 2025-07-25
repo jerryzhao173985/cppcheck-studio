@@ -182,6 +182,7 @@ class OptimizedDashboardGenerator:
         :root {{
             --bg-primary: #ffffff;
             --bg-secondary: #f8f9fa;
+            --bg-secondary-rgb: 248, 249, 250;
             --bg-tertiary: #e9ecef;
             --text-primary: #212529;
             --text-secondary: #6c757d;
@@ -199,6 +200,7 @@ class OptimizedDashboardGenerator:
         [data-theme="dark"] {{
             --bg-primary: #1a1a1a;
             --bg-secondary: #2d2d2d;
+            --bg-secondary-rgb: 45, 45, 45;
             --bg-tertiary: #3a3a3a;
             --text-primary: #e0e0e0;
             --text-secondary: #a0a0a0;
@@ -231,7 +233,7 @@ class OptimizedDashboardGenerator:
             top: 0;
             z-index: 100;
             backdrop-filter: blur(10px);
-            background: rgba(var(--bg-secondary), 0.95);
+            background: rgba(var(--bg-secondary-rgb), 0.95);
         }}
         
         .header-content {{
