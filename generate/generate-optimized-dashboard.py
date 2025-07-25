@@ -179,34 +179,93 @@ class OptimizedDashboardGenerator:
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Code Analysis - Optimized Dashboard</title>
     <style>
+        /*
+         * CSS Variable System Documentation
+         * =================================
+         * This dashboard uses CSS custom properties for theming and consistency.
+         * 
+         * Color Variables:
+         * - All colors are defined as both hex (--color) and RGB (--color-rgb) values
+         * - RGB values are used for alpha transparency with rgba()
+         * - Hex values are used for solid colors
+         * 
+         * Usage Examples:
+         * - Solid color: background: var(--bg-primary);
+         * - With alpha: background: rgba(var(--bg-primary-rgb), 0.9);
+         * - With fallback: color: var(--text-primary, #212529);
+         * 
+         * Theme Support:
+         * - Light theme: Default :root variables
+         * - Dark theme: [data-theme="dark"] overrides
+         * - System preference: @media (prefers-color-scheme: dark)
+         */
+        
+        /* CSS Custom Properties with RGB fallbacks for better compatibility */
         :root {{
+            /* Primary colors as hex */
             --bg-primary: #ffffff;
             --bg-secondary: #f8f9fa;
-            --bg-secondary-rgb: 248, 249, 250;
             --bg-tertiary: #e9ecef;
+            
+            /* RGB equivalents for alpha transparency */
+            --bg-primary-rgb: 255, 255, 255;
+            --bg-secondary-rgb: 248, 249, 250;
+            --bg-tertiary-rgb: 233, 236, 239;
+            
+            /* Text colors */
             --text-primary: #212529;
             --text-secondary: #6c757d;
+            --text-primary-rgb: 33, 37, 41;
+            --text-secondary-rgb: 108, 117, 125;
+            
+            /* UI colors */
             --border-color: #dee2e6;
+            --border-color-rgb: 222, 226, 230;
+            --hover-bg: var(--bg-secondary);
+            --hover-bg-rgb: var(--bg-secondary-rgb);
+            
+            /* Status colors */
             --error-color: #dc3545;
             --warning-color: #ffc107;
             --info-color: #0dcaf0;
             --success-color: #198754;
             --style-color: #6f42c1;
-            --hover-bg: #f8f9fa;
-            --shadow: 0 1px 3px rgba(0,0,0,0.12);
-            --font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', monospace;
+            
+            /* Effects */
+            --shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+            --shadow-hover: 0 2px 8px rgba(0, 0, 0, 0.15);
+            --transition-speed: 200ms;
+            
+            /* Typography */
+            --font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
         }}
         
         [data-theme="dark"] {{
+            /* Primary colors as hex */
             --bg-primary: #1a1a1a;
             --bg-secondary: #2d2d2d;
-            --bg-secondary-rgb: 45, 45, 45;
             --bg-tertiary: #3a3a3a;
+            
+            /* RGB equivalents for alpha transparency */
+            --bg-primary-rgb: 26, 26, 26;
+            --bg-secondary-rgb: 45, 45, 45;
+            --bg-tertiary-rgb: 58, 58, 58;
+            
+            /* Text colors */
             --text-primary: #e0e0e0;
             --text-secondary: #a0a0a0;
+            --text-primary-rgb: 224, 224, 224;
+            --text-secondary-rgb: 160, 160, 160;
+            
+            /* UI colors */
             --border-color: #404040;
-            --hover-bg: #2d2d2d;
-            --shadow: 0 1px 3px rgba(0,0,0,0.5);
+            --border-color-rgb: 64, 64, 64;
+            --hover-bg: var(--bg-tertiary);
+            --hover-bg-rgb: var(--bg-tertiary-rgb);
+            
+            /* Effects */
+            --shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+            --shadow-hover: 0 2px 8px rgba(0, 0, 0, 0.7);
         }}
         
         * {{
