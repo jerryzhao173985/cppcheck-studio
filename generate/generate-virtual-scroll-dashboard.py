@@ -153,7 +153,7 @@ class VirtualScrollDashboardGenerator:
         <!-- Issues Count and Loading Status -->
         <div class="status-bar">
             <div class="issues-count">
-                <span id="issuesCount">Loading...</span>
+                <span id="issuesCount" role="status" aria-live="polite">Loading...</span>
             </div>
             <div class="loading-status" id="loadingStatus" style="display: none;">
                 <i class="fas fa-spinner fa-spin"></i> <span id="loadingText">Loading...</span>
@@ -228,8 +228,17 @@ class VirtualScrollDashboardGenerator:
             containerHeight: 0
         }};
         
-        // Create debounced filter function
-        const debouncedFilter = debounce(filterData, 300);
+        // Create debounced filter function with loading indicator
+        const debouncedFilter = debounce((e) => {{
+            const searchValue = e ? e.target.value : document.getElementById('searchInput').value;
+            if (searchValue.length > 0) {{
+                showLoadingStatus('Searching...');
+            }}
+            filterData();
+            if (searchValue.length > 0) {{
+                setTimeout(hideLoadingStatus, 100);
+            }}
+        }}, 300);
         
         // Initialize
         async function initialize() {{
@@ -245,8 +254,27 @@ class VirtualScrollDashboardGenerator:
                 // Initial render
                 filterData();
                 
-                // Set up search event listener
-                document.getElementById('searchInput').addEventListener('input', debouncedFilter);
+                // Set up search event listeners
+                const searchInput = document.getElementById('searchInput');
+                searchInput.addEventListener('input', debouncedFilter);
+                
+                // Clear search on Escape key
+                searchInput.addEventListener('keydown', (e) => {{
+                    if (e.key === 'Escape') {{
+                        e.target.value = '';
+                        debouncedFilter.cancel();
+                        filterData();
+                    }}
+                }});
+                
+                // Focus search on Ctrl+F or Cmd+F
+                document.addEventListener('keydown', (e) => {{
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'f') {{
+                        e.preventDefault();
+                        searchInput.focus();
+                        searchInput.select();
+                    }}
+                }});
                 
                 hideLoadingStatus();
             }} catch (error) {{
@@ -578,16 +606,42 @@ class VirtualScrollDashboardGenerator:
             return message || '';
         }}
         
-        function debounce(func, wait) {{
+        function debounce(func, wait, immediate = false) {{
             let timeout;
-            return function executedFunction(...args) {{
+            let cancelled = false;
+            
+            const debounced = function(...args) {{
+                if (cancelled) return;
+                
+                const callNow = immediate && !timeout;
                 const later = () => {{
-                    clearTimeout(timeout);
-                    func(...args);
+                    timeout = null;
+                    if (!immediate && !cancelled) {{
+                        func.apply(this, args);
+                    }}
                 }};
+                
                 clearTimeout(timeout);
                 timeout = setTimeout(later, wait);
+                
+                if (callNow) {{
+                    func.apply(this, args);
+                }}
             }};
+            
+            // Add cancel method
+            debounced.cancel = function() {{
+                clearTimeout(timeout);
+                timeout = null;
+                cancelled = true;
+            }};
+            
+            // Add reset method
+            debounced.reset = function() {{
+                cancelled = false;
+            }};
+            
+            return debounced;
         }}
         
         function showLoadingStatus(text) {{
@@ -668,6 +722,24 @@ class VirtualScrollDashboardGenerator:
     def generate_styles(self):
         """Generate CSS styles with fixed alignment"""
         return """
+        /*
+         * Virtual Scroll Dashboard CSS System
+         * ===================================
+         * This dashboard uses a modern CSS approach with:
+         * 
+         * 1. CSS Variables for theming (var(--name, fallback))
+         * 2. Responsive design with mobile-first approach
+         * 3. Virtual scrolling for performance with large datasets
+         * 4. Accessible color contrast ratios
+         * 5. Smooth transitions for better UX
+         * 
+         * Key Variables:
+         * - Colors: Use var() with fallbacks for older browsers
+         * - Transitions: Consistent timing (200ms default)
+         * - Font sizes: Base 16px, UI elements 0.85em
+         * - Mobile: 14px base font below 768px
+         */
+        
         * { box-sizing: border-box; margin: 0; padding: 0; }
         
         body {
@@ -823,13 +895,26 @@ class VirtualScrollDashboardGenerator:
             border: 1px solid #e2e8f0;
             border-radius: 6px;
             font-size: 0.85em;
-            transition: border-color 0.2s;
+            transition: all 0.2s ease;
+            background: var(--bg-primary, #ffffff);
+            color: var(--text-primary, #212529);
         }
         
         .search-container input:focus {
             outline: none;
             border-color: #667eea;
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            background: var(--bg-primary, #ffffff);
+        }
+        
+        .search-container input::placeholder {
+            color: var(--text-secondary, #6c757d);
+            opacity: 0.7;
+        }
+        
+        .search-container input:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
         }
         
         .filter-buttons {
