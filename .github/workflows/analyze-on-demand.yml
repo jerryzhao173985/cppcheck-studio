@@ -388,8 +388,8 @@ jobs:
         if [ -n "$SCRIPT_LOCATION" ]; then
           echo "✅ Found script at: $SCRIPT_LOCATION"
           python3 "$SCRIPT_LOCATION" cppcheck-results.xml > analysis.json
-        elif [ -f "$GITHUB_WORKSPACE/xml2json-simple.py" ]; then
-          echo "✅ Found script at: $GITHUB_WORKSPACE/xml2json-simple.py"
+        elif [ -f "$GITHUB_WORKSPACE/utils/xml2json-simple.py" ]; then
+          echo "✅ Found script at: $GITHUB_WORKSPACE/utils/xml2json-simple.py"
           python3 "$GITHUB_WORKSPACE/utils/xml2json-simple.py" cppcheck-results.xml > analysis.json
         else
           echo "❌ Could not find xml2json-simple.py!"
