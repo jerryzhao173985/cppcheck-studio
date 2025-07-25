@@ -77,6 +77,15 @@ class VirtualScrollDashboardGenerator:
 </head>
 <body>
     <div class="container">
+        <!-- Font Size Controls -->
+        <div class="font-size-controls" id="fontSizeControls" style="position: fixed; top: 10px; right: 10px; z-index: 1000; background: rgba(255,255,255,0.95); padding: 8px 12px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 8px;">
+            <label style="font-size: 0.85em; color: #666;">Font Size:</label>
+            <button onclick="adjustFontSize(-1)" title="Decrease font size (Ctrl -)" style="width: 30px; height: 30px; border: 1px solid #ddd; background: white; cursor: pointer; border-radius: 4px; font-size: 14px; transition: all 0.2s;">A-</button>
+            <button onclick="adjustFontSize(0)" title="Reset font size (Ctrl 0)" style="width: 30px; height: 30px; border: 1px solid #ddd; background: white; cursor: pointer; border-radius: 4px; font-size: 14px; transition: all 0.2s;">A</button>
+            <button onclick="adjustFontSize(1)" title="Increase font size (Ctrl +)" style="width: 30px; height: 30px; border: 1px solid #ddd; background: white; cursor: pointer; border-radius: 4px; font-size: 14px; transition: all 0.2s;">A+</button>
+            <span id="fontSizeDisplay" style="font-size: 0.85em; color: #666; min-width: 40px; text-align: right;">100%</span>
+        </div>
+        
         <!-- Header -->
         <header class="header">
             <div class="header-content">
@@ -210,7 +219,11 @@ class VirtualScrollDashboardGenerator:
             SCROLL_DEBOUNCE: 10,
             SEARCH_DEBOUNCE: 300,
             BATCH_SIZE: 50,
-            DATA_DIR: '{data_dir}'
+            DATA_DIR: '{data_dir}',
+            MAX_CONTEXT_CACHE: 1000,
+            CLEANUP_INTERVAL: 60000,
+            RENDER_BATCH_SIZE: 100,
+            INTERSECTION_THRESHOLD: 0.1
         }};
         
         // Global state
@@ -225,7 +238,9 @@ class VirtualScrollDashboardGenerator:
             visibleEnd: 0,
             isLoading: false,
             scrollTop: 0,
-            containerHeight: 0
+            containerHeight: 0,
+            fontSize: 100, // Font size percentage
+            renderPending: false
         }};
         
         // Create debounced filter function with loading indicator
@@ -240,22 +255,90 @@ class VirtualScrollDashboardGenerator:
             }}
         }}, 300);
         
-        // Initialize
+        // Global error handlers
+        window.addEventListener('error', (event) => {{
+            console.error('Global error:', event.error);
+            showErrorNotification('An unexpected error occurred', event.error.message);
+        }});
+        
+        window.addEventListener('unhandledrejection', (event) => {{
+            console.error('Unhandled promise rejection:', event.reason);
+            showErrorNotification('Failed to load resource', event.reason);
+        }});
+        
+        // Error notification system
+        function showErrorNotification(title, message) {{
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #ff4444;
+                color: white;
+                padding: 15px 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                z-index: 10000;
+                max-width: 400px;
+                animation: slideIn 0.3s ease-out;
+            `;
+            
+            notification.innerHTML = `
+                <div style="display: flex; align-items: start; gap: 10px;">
+                    <i class="fas fa-exclamation-circle" style="font-size: 20px;"></i>
+                    <div>
+                        <strong style="display: block; margin-bottom: 5px;">${{title}}</strong>
+                        <span style="font-size: 0.9em; opacity: 0.9;">${{message || 'Unknown error'}}</span>
+                    </div>
+                    <button onclick="this.parentElement.parentElement.remove()" 
+                            style="background: none; border: none; color: white; 
+                                   font-size: 20px; cursor: pointer; margin-left: auto;">×</button>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 8000);
+        }}
+        
+        // Initialize with comprehensive error handling
         async function initialize() {{
+            let initTimeout;
+            
             try {{
                 showLoadingStatus('Loading issues data...');
                 
+                // Set initialization timeout
+                initTimeout = setTimeout(() => {{
+                    throw new Error('Initialization timeout - please check your data files');
+                }}, 30000);
+                
                 // Load issues from JSONL
-                await loadIssuesData();
+                await loadIssuesData().catch(error => {{
+                    throw new Error(`Data loading failed: ${{error.message}}`);
+                }});
+                
+                clearTimeout(initTimeout);
+                
+                // Validate data
+                if (!state.allIssues || state.allIssues.length === 0) {{
+                    throw new Error('No issues found in data file');
+                }}
                 
                 // Set up virtual scrolling
                 setupVirtualScroll();
                 
+                // Start memory monitoring
+                startMemoryMonitoring();
+                
                 // Initial render
                 filterData();
                 
-                // Set up search event listeners
+                // Set up search event listeners with error handling
                 const searchInput = document.getElementById('searchInput');
+                if (!searchInput) {{
+                    throw new Error('Search input element not found');
+                }}
+                
                 searchInput.addEventListener('input', debouncedFilter);
                 
                 // Clear search on Escape key
@@ -273,33 +356,115 @@ class VirtualScrollDashboardGenerator:
                         e.preventDefault();
                         searchInput.focus();
                         searchInput.select();
+                    }} else if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '=')) {{
+                        e.preventDefault();
+                        adjustFontSize(1);
+                    }} else if ((e.ctrlKey || e.metaKey) && e.key === '-') {{
+                        e.preventDefault();
+                        adjustFontSize(-1);
+                    }} else if ((e.ctrlKey || e.metaKey) && e.key === '0') {{
+                        e.preventDefault();
+                        adjustFontSize(0);
                     }}
                 }});
                 
                 hideLoadingStatus();
+                console.log(`Dashboard initialized successfully with ${{state.allIssues.length}} issues`);
+                
             }} catch (error) {{
+                clearTimeout(initTimeout);
                 console.error('Initialization error:', error);
-                alert('Failed to load dashboard: ' + error.message);
+                hideLoadingStatus();
+                
+                // Show user-friendly error
+                showErrorNotification('Dashboard Initialization Failed', error.message);
+                
+                // Display fallback UI
+                displayFallbackUI(error);
             }}
         }}
         
         // Load issues data from JSONL
+        // Load issues data with comprehensive error handling
         async function loadIssuesData() {{
+            let response;
+            
             try {{
-                const response = await fetch('{data_dir}/issues.jsonl');
-                const text = await response.text();
-                const lines = text.trim().split('\\n');
+                // Fetch with timeout
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 15000);
                 
-                state.allIssues = lines.map(line => {{
+                response = await fetch('{data_dir}/issues.jsonl', {{
+                    signal: controller.signal
+                }}).catch(error => {{
+                    if (error.name === 'AbortError') {{
+                        throw new Error('Request timeout - data file is taking too long to load');
+                    }}
+                    throw new Error(`Network error: ${{error.message}}`);
+                }});
+                
+                clearTimeout(timeout);
+                
+                if (!response.ok) {{
+                    throw new Error(`Failed to load data: HTTP ${{response.status}} ${{response.statusText}}`);
+                }}
+                
+                const text = await response.text();
+                
+                if (!text || text.trim() === '') {{
+                    throw new Error('Data file is empty');
+                }}
+                
+                const lines = text.trim().split('\\n');
+                let parseErrors = 0;
+                const errors = [];
+                
+                state.allIssues = lines.map((line, index) => {{
+                    if (!line || line.trim() === '') return null;
+                    
                     try {{
-                        return JSON.parse(line);
+                        const issue = JSON.parse(line);
+                        
+                        // Basic validation
+                        if (!issue || typeof issue !== 'object') {{
+                            throw new Error('Invalid issue object');
+                        }}
+                        
+                        // Ensure required fields have defaults
+                        return {{
+                            id: issue.id || `issue_${{index}}`,
+                            file: issue.file || 'Unknown file',
+                            line: issue.line || 0,
+                            severity: issue.severity || 'style',
+                            message: issue.message || 'No message',
+                            ...issue
+                        }};
+                        
                     }} catch (e) {{
-                        console.error('Failed to parse line:', line);
+                        parseErrors++;
+                        if (parseErrors <= 5) {{
+                            errors.push(`Line ${{index + 1}}: ${{e.message}}`);
+                        }}
+                        console.error(`Failed to parse line ${{index + 1}}:`, e);
                         return null;
                     }}
                 }}).filter(Boolean);
                 
-                console.log('Loaded', state.allIssues.length, 'issues');
+                if (state.allIssues.length === 0) {{
+                    throw new Error('No valid issues found in data file');
+                }}
+                
+                // Show warning for parse errors
+                if (parseErrors > 0) {{
+                    const errorMsg = `Skipped ${{parseErrors}} invalid entries`;
+                    console.warn(errorMsg);
+                    if (parseErrors > 10) {{
+                        showErrorNotification('Data Quality Warning', errorMsg);
+                    }}
+                }}
+                
+                console.log(`Successfully loaded ${{state.allIssues.length}} issues`);
+                
             }} catch (error) {{
                 console.error('Failed to load issues:', error);
                 throw error;
@@ -307,26 +472,68 @@ class VirtualScrollDashboardGenerator:
         }}
         
         // Load code context for specific issue IDs
+        // Memory-optimized code context loading with streaming
         async function loadCodeContext(issueIds) {{
             const idsToLoad = issueIds.filter(id => !state.loadedContextIds.has(id));
             if (idsToLoad.length === 0) return;
             
+            // Memory cleanup if needed
+            if (state.codeContextMap.size > CONFIG.MAX_CONTEXT_CACHE) {{
+                cleanupOldContextEntries();
+            }}
+            
             try {{
                 const response = await fetch('{data_dir}/code_context.jsonl');
-                const text = await response.text();
-                const lines = text.trim().split('\\n');
+                if (!response.ok) throw new Error('Failed to fetch code context');
                 
-                lines.forEach(line => {{
+                // Use streaming to handle large files efficiently
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let processedCount = 0;
+                
+                while (true) {{
+                    const {{ done, value }} = await reader.read();
+                    if (done) break;
+                    
+                    buffer += decoder.decode(value, {{ stream: true }});
+                    const lines = buffer.split('\\n');
+                    buffer = lines.pop() || '';
+                    
+                    for (const line of lines) {{
+                        if (!line) continue;
+                        
+                        try {{
+                            const data = JSON.parse(line);
+                            if (idsToLoad.includes(data.id)) {{
+                                state.codeContextMap.set(data.id, data.code_context);
+                                state.loadedContextIds.add(data.id);
+                                processedCount++;
+                                
+                                // Break early if we've loaded all needed contexts
+                                if (processedCount >= idsToLoad.length) {{
+                                    reader.cancel();
+                                    return;
+                                }}
+                            }}
+                        }} catch (e) {{
+                            console.error('Failed to parse code context line:', e);
+                        }}
+                    }}
+                }}
+                
+                // Process remaining buffer
+                if (buffer && buffer.trim()) {{
                     try {{
-                        const data = JSON.parse(line);
+                        const data = JSON.parse(buffer);
                         if (idsToLoad.includes(data.id)) {{
                             state.codeContextMap.set(data.id, data.code_context);
                             state.loadedContextIds.add(data.id);
                         }}
                     }} catch (e) {{
-                        console.error('Failed to parse code context:', e);
+                        console.error('Failed to parse final context:', e);
                     }}
-                }});
+                }}
                 
                 console.log('Loaded code context for', idsToLoad.length, 'issues');
             }} catch (error) {{
@@ -355,8 +562,13 @@ class VirtualScrollDashboardGenerator:
             }}, CONFIG.SCROLL_DEBOUNCE));
         }}
         
-        // Render visible rows based on scroll position
+        // Render visible rows based on scroll position with performance optimization
         async function renderVisibleRows() {{
+            // Prevent concurrent renders
+            if (state.renderPending) return;
+            state.renderPending = true;
+            
+            const renderStart = performance.now();
             const totalHeight = state.filteredIssues.length * CONFIG.ROW_HEIGHT;
             const visibleStart = Math.floor(state.scrollTop / CONFIG.ROW_HEIGHT) - CONFIG.VISIBLE_BUFFER;
             const visibleEnd = Math.ceil((state.scrollTop + state.containerHeight) / CONFIG.ROW_HEIGHT) + CONFIG.VISIBLE_BUFFER;
@@ -380,10 +592,21 @@ class VirtualScrollDashboardGenerator:
             const tbody = document.getElementById('issuesBody');
             tbody.innerHTML = '';
             
+            // Batch DOM updates using DocumentFragment for better performance
+            const fragment = document.createDocumentFragment();
             visibleIssues.forEach((issue, index) => {{
                 const row = createIssueRow(issue, state.visibleStart + index);
-                tbody.appendChild(row);
+                fragment.appendChild(row);
             }});
+            tbody.appendChild(fragment);
+            
+            // Performance monitoring
+            const renderTime = performance.now() - renderStart;
+            if (renderTime > 50) {{
+                console.warn(`Slow render: ${{renderTime.toFixed(2)}}ms for ${{visibleIssues.length}} rows`);
+            }}
+            
+            state.renderPending = false;
         }}
         
         // Create issue row
@@ -665,11 +888,167 @@ class VirtualScrollDashboardGenerator:
             }}
         }};
         
+        // Font size adjustment functions
+        function adjustFontSize(delta) {{
+            if (delta === 0) {{
+                // Reset to default
+                state.fontSize = 100;
+            }} else {{
+                // Adjust by 10% increments
+                state.fontSize = Math.max(70, Math.min(150, state.fontSize + (delta * 10)));
+            }}
+            
+            // Apply new font size
+            document.documentElement.style.fontSize = state.fontSize + '%';
+            
+            // Update display
+            const display = document.getElementById('fontSizeDisplay');
+            if (display) {{
+                display.textContent = state.fontSize + '%';
+            }}
+            
+            // Save preference
+            try {{
+                localStorage.setItem('dashboardFontSize', state.fontSize);
+            }} catch (e) {{
+                console.warn('Could not save font size preference:', e);
+            }}
+            
+            // Adjust row height proportionally
+            const newRowHeight = Math.round(50 * (state.fontSize / 100));
+            if (CONFIG.ROW_HEIGHT !== newRowHeight) {{
+                CONFIG.ROW_HEIGHT = newRowHeight;
+                renderVisibleRows();
+            }}
+        }}
+        
+        // Load saved font size preference
+        function loadFontSizePreference() {{
+            try {{
+                const saved = localStorage.getItem('dashboardFontSize');
+                if (saved) {{
+                    state.fontSize = parseInt(saved, 10);
+                    if (!isNaN(state.fontSize) && state.fontSize >= 70 && state.fontSize <= 150) {{
+                        document.documentElement.style.fontSize = state.fontSize + '%';
+                        CONFIG.ROW_HEIGHT = Math.round(50 * (state.fontSize / 100));
+                    }} else {{
+                        state.fontSize = 100;
+                    }}
+                }}
+            }} catch (e) {{
+                console.warn('Could not load font size preference:', e);
+            }}
+        }}
+        
+        // Memory cleanup function
+        function cleanupOldContextEntries() {{
+            const maxSize = CONFIG.MAX_CONTEXT_CACHE;
+            if (state.codeContextMap.size <= maxSize) return;
+            
+            const entriesToRemove = state.codeContextMap.size - Math.floor(maxSize * 0.8);
+            const keysToRemove = Array.from(state.codeContextMap.keys()).slice(0, entriesToRemove);
+            
+            keysToRemove.forEach(key => {{
+                state.codeContextMap.delete(key);
+                state.loadedContextIds.delete(key);
+            }});
+            
+            console.log(`Cleaned up ${{entriesToRemove}} old context entries`);
+        }}
+        
+        // Monitor memory usage
+        function startMemoryMonitoring() {{
+            if (!performance.memory) return;
+            
+            setInterval(() => {{
+                const memInfo = performance.memory;
+                const usagePercent = (memInfo.usedJSHeapSize / memInfo.jsHeapSizeLimit) * 100;
+                
+                if (usagePercent > 80) {{
+                    console.warn(`High memory usage: ${{usagePercent.toFixed(1)}}%`);
+                    cleanupOldContextEntries();
+                    
+                    // Force garbage collection if available
+                    if (window.gc) {{
+                        window.gc();
+                    }}
+                }}
+            }}, 30000); // Check every 30 seconds
+        }}
+        
         // Initialize when DOM is ready
         if (document.readyState === 'loading') {{
-            document.addEventListener('DOMContentLoaded', initialize);
+            document.addEventListener('DOMContentLoaded', () => {{
+                loadFontSizePreference();
+                initialize();
+            }});
         }} else {{
+            loadFontSizePreference();
             initialize();
+        }}
+        
+        // Display fallback UI when critical errors occur
+        function displayFallbackUI(error) {{
+            const container = document.querySelector('.container');
+            if (!container) return;
+            
+            container.innerHTML = `
+                <div style="display: flex; flex-direction: column; align-items: center; 
+                            justify-content: center; min-height: 100vh; padding: 40px; 
+                            text-align: center; background: #f5f7fa;">
+                    <div style="background: white; padding: 40px; border-radius: 16px; 
+                                box-shadow: 0 4px 20px rgba(0,0,0,0.1); max-width: 600px;">
+                        <i class="fas fa-exclamation-triangle" 
+                           style="font-size: 64px; color: #ff4444; margin-bottom: 20px;"></i>
+                        <h1 style="font-size: 28px; color: #333; margin-bottom: 15px;">
+                            Dashboard Loading Error
+                        </h1>
+                        <p style="font-size: 18px; color: #666; margin-bottom: 30px; line-height: 1.6;">
+                            ${{error.message || 'An unexpected error occurred while loading the dashboard.'}}
+                        </p>
+                        
+                        <div style="display: flex; gap: 15px; justify-content: center; margin-bottom: 30px;">
+                            <button onclick="location.reload()" 
+                                    style="padding: 12px 24px; background: #4CAF50; color: white; 
+                                           border: none; border-radius: 8px; cursor: pointer; 
+                                           font-size: 16px; font-weight: 500; 
+                                           transition: background 0.2s;">
+                                <i class="fas fa-redo" style="margin-right: 8px;"></i>
+                                Retry Loading
+                            </button>
+                            <button onclick="window.history.back()" 
+                                    style="padding: 12px 24px; background: #666; color: white; 
+                                           border: none; border-radius: 8px; cursor: pointer; 
+                                           font-size: 16px; font-weight: 500; 
+                                           transition: background 0.2s;">
+                                <i class="fas fa-arrow-left" style="margin-right: 8px;"></i>
+                                Go Back
+                            </button>
+                        </div>
+                        
+                        <details style="text-align: left; background: #f8f9fa; padding: 20px; 
+                                        border-radius: 8px; margin-top: 20px;">
+                            <summary style="cursor: pointer; font-weight: 600; color: #333; 
+                                           margin-bottom: 10px;">Troubleshooting Tips</summary>
+                            <ul style="margin: 10px 0 0 0; padding-left: 20px; color: #666; 
+                                       line-height: 1.8;">
+                                <li>Verify that <code>issues.jsonl</code> exists in the data directory</li>
+                                <li>Check that the JSON data is properly formatted</li>
+                                <li>Ensure you have a stable internet connection</li>
+                                <li>Try clearing your browser cache and cookies</li>
+                                <li>Check the browser console (F12) for detailed errors</li>
+                            </ul>
+                            <div style="margin-top: 15px; padding: 10px; background: #fff; 
+                                        border-left: 4px solid #ff4444; border-radius: 4px;">
+                                <strong>Error Details:</strong>
+                                <pre style="margin: 5px 0 0 0; font-family: monospace; 
+                                            font-size: 12px; color: #666; 
+                                            white-space: pre-wrap;">${{error.stack || error.toString()}}</pre>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+            `;
         }}
     </script>
 </body>
@@ -1380,6 +1759,138 @@ class VirtualScrollDashboardGenerator:
             
             .col-file { width: 30%; }
             .col-message { width: calc(100% - 30% - 60px - 100px - 80px - 60px - 20px); }
+        }
+        
+        /* Print Styles for Virtual Scroll Dashboard */
+        @media print {
+            /* Reset for clean printing */
+            * {
+                background: transparent !important;
+                color: #000 !important;
+                box-shadow: none !important;
+                text-shadow: none !important;
+            }
+            
+            body {
+                font-size: 11pt;
+                line-height: 1.4;
+                font-family: Georgia, serif;
+                overflow: visible !important;
+            }
+            
+            /* Hide non-essential elements */
+            .controls,
+            .search-container,
+            .filter-buttons,
+            .actions-cell,
+            .loading-status,
+            #codeModal,
+            button {
+                display: none !important;
+            }
+            
+            /* Header */
+            .header {
+                background: none !important;
+                color: #000 !important;
+                border-bottom: 2px solid #000;
+                padding: 0 0 10px 0;
+                margin-bottom: 20px;
+            }
+            
+            /* Statistics */
+            .stats-grid {
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 20px;
+                page-break-inside: avoid;
+            }
+            
+            .stat-card {
+                border: 1px solid #000;
+                padding: 10px;
+                text-align: center;
+                flex: 1;
+                margin: 0 5px;
+            }
+            
+            /* Table layout for print */
+            .table-wrapper {
+                overflow: visible !important;
+                height: auto !important;
+            }
+            
+            #scrollContainer {
+                height: auto !important;
+                overflow: visible !important;
+            }
+            
+            .issues-table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 9pt;
+            }
+            
+            .issues-table th,
+            .issues-table td {
+                border: 1px solid #000;
+                padding: 5px;
+                text-align: left;
+            }
+            
+            .issues-table th {
+                background-color: #f0f0f0 !important;
+                font-weight: bold;
+            }
+            
+            /* Show all issues for print */
+            #issuesBody tr {
+                display: table-row !important;
+                page-break-inside: avoid;
+            }
+            
+            /* Spacers not needed for print */
+            #spacerTop,
+            #spacerBottom {
+                display: none !important;
+            }
+            
+            /* File paths */
+            .file-path {
+                font-family: monospace;
+                font-size: 8pt;
+            }
+            
+            /* Page setup */
+            @page {
+                size: A4 landscape;
+                margin: 0.5in;
+            }
+        }
+        
+        /* Accessibility: Reduced motion support */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation: none !important;
+                transition: none !important;
+            }
+            
+            .fa-spin {
+                animation: none !important;
+            }
+        }
+        
+        /* Accessibility: High contrast support */
+        @media (prefers-contrast: high) {
+            .stat-card,
+            .issues-table th,
+            .issues-table td {
+                border-width: 2px;
+            }
+            
+            .severity-error { color: #cc0000; }
+            .severity-warning { color: #ff6600; }
+            .severity-style { color: #6600cc; }
         }
         """
 

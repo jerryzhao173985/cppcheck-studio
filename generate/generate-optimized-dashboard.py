@@ -888,6 +888,164 @@ class OptimizedDashboardGenerator:
         .hljs-comment {{ color: #6a737d; }}
         .hljs-number {{ color: #005cc5; }}
         .hljs-function {{ color: #6f42c1; }}
+        
+        /* Print Styles for Professional Reports */
+        @media print {{
+            /* Reset for print */
+            * {{
+                background: transparent !important;
+                color: #000 !important;
+                box-shadow: none !important;
+                text-shadow: none !important;
+            }}
+            
+            body {{
+                font-size: 12pt;
+                line-height: 1.5;
+                font-family: Georgia, 'Times New Roman', serif;
+                margin: 0;
+                padding: 0;
+            }}
+            
+            /* Hide interactive elements */
+            .controls,
+            .search-container,
+            .filter-buttons,
+            button,
+            .action-btn,
+            .toggle-fix,
+            .fix-button,
+            a[href^="#"],
+            a[href^="javascript:"] {{
+                display: none !important;
+            }}
+            
+            /* Header styling */
+            .header {{
+                background: none !important;
+                border-bottom: 2px solid #000;
+                padding: 0 0 1em 0;
+                margin-bottom: 1em;
+            }}
+            
+            .title {{
+                font-size: 24pt;
+                font-weight: bold;
+                margin-bottom: 0.5em;
+                color: #000;
+            }}
+            
+            /* Stats formatting */
+            .stats-bar {{
+                display: flex;
+                justify-content: space-between;
+                margin: 1em 0;
+                page-break-inside: avoid;
+            }}
+            
+            .stat-badge {{
+                border: 1px solid #000;
+                padding: 0.5em;
+                text-align: center;
+                flex: 1;
+                margin: 0 0.25em;
+            }}
+            
+            /* Tables */
+            .issue-table {{
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 10pt;
+                page-break-inside: auto;
+            }}
+            
+            .issue-table th,
+            .issue-table td {{
+                border: 1px solid #000;
+                padding: 0.5em;
+                text-align: left;
+            }}
+            
+            .issue-table th {{
+                background-color: #f0f0f0 !important;
+                font-weight: bold;
+                position: sticky;
+                top: 0;
+            }}
+            
+            .issue-table tr {{
+                page-break-inside: avoid;
+                page-break-after: auto;
+            }}
+            
+            /* Severity labels */
+            .severity-badge {{
+                font-weight: bold;
+                padding: 0.2em 0.5em;
+                border: 1px solid #000;
+            }}
+            
+            /* URLs */
+            a[href]:after {{
+                content: " (" attr(href) ")";
+                font-size: 80%;
+                font-style: italic;
+            }}
+            
+            /* Page setup */
+            @page {{
+                size: A4;
+                margin: 0.75in;
+            }}
+            
+            @page :first {{
+                margin-top: 0.5in;
+            }}
+            
+            /* Page numbers */
+            .page-break {{
+                page-break-before: always;
+            }}
+        }}
+        
+        /* Accessibility: High contrast mode */
+        @media (prefers-contrast: high) {{
+            :root {{
+                --bg-primary: #ffffff;
+                --bg-secondary: #f0f0f0;
+                --text-primary: #000000;
+                --text-secondary: #333333;
+                --border-color: #000000;
+                --error-color: #cc0000;
+                --warning-color: #ff6600;
+            }}
+            
+            .stat-badge,
+            .severity-badge {{
+                border-width: 2px;
+            }}
+            
+            .issue-table th,
+            .issue-table td {{
+                border-width: 2px;
+            }}
+        }}
+        
+        /* Accessibility: Reduced motion */
+        @media (prefers-reduced-motion: reduce) {{
+            *,
+            *::before,
+            *::after {{
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }}
+            
+            .loading-spinner {{
+                animation: none;
+            }}
+        }}
     </style>
 </head>
 <body>
