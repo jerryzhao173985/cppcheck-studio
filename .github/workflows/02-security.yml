@@ -1,0 +1,197 @@
+name: 02 - Security Scanning
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '30 2 * * 1'  # Weekly on Monday at 2:30 AM
+  workflow_call:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  dependency-scan:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        severity: 'CRITICAL,HIGH,MEDIUM'
+        exit-code: '0'  # Don't fail the build
+    
+    - name: Upload Trivy scan results to GitHub Security
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: 'trivy-results.sarif'
+        category: 'dependency-scan'
+    
+    - name: Check npm dependencies
+      run: |
+        cd cppcheck-dashboard-generator
+        npm audit --production --audit-level=moderate || true
+        
+        # Create summary
+        echo "### 🔒 NPM Audit Results" >> $GITHUB_STEP_SUMMARY
+        npm audit --production --json | jq -r '
+          if .metadata.vulnerabilities.total == 0 then
+            "✅ No vulnerabilities found!"
+          else
+            "⚠️ Found \(.metadata.vulnerabilities.total) vulnerabilities:\n" +
+            "- Critical: \(.metadata.vulnerabilities.critical)\n" +
+            "- High: \(.metadata.vulnerabilities.high)\n" +
+            "- Moderate: \(.metadata.vulnerabilities.moderate)\n" +
+            "- Low: \(.metadata.vulnerabilities.low)"
+          end
+        ' >> $GITHUB_STEP_SUMMARY || echo "Unable to parse audit results" >> $GITHUB_STEP_SUMMARY
+
+  codeql-analysis:
+    name: CodeQL Security Analysis
+    runs-on: ubuntu-latest
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['javascript', 'python']
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ matrix.language }}
+        queries: security-and-quality
+    
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@v3
+    
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:${{matrix.language}}"
+
+  secret-scanning:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for better detection
+    
+    - name: TruffleHog OSS
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./
+        base: ${{ github.event.repository.default_branch }}
+        head: HEAD
+        extra_args: --debug --only-verified
+    
+    - name: Gitleaks
+      uses: gitleaks/gitleaks-action@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  license-check:
+    name: License Compliance Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: cppcheck-dashboard-generator/package-lock.json
+    
+    - name: Install license checker
+      run: npm install -g license-checker
+    
+    - name: Check TypeScript package licenses
+      run: |
+        cd cppcheck-dashboard-generator
+        npm ci
+        
+        echo "### 📜 License Compliance Report" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Check for problematic licenses
+        PROBLEMATIC=$(license-checker --onlyAllow 'MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;CC0-1.0;CC-BY-4.0;Unlicense' --summary 2>&1 || true)
+        
+        if [[ "$PROBLEMATIC" == *"All licenses are permitted"* ]]; then
+          echo "✅ All dependencies have compatible licenses" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⚠️ Found dependencies with potentially incompatible licenses:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "$PROBLEMATIC" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        # Generate full license report
+        license-checker --json > licenses.json
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "<details><summary>📋 Full License Report</summary>" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Package | License |" >> $GITHUB_STEP_SUMMARY
+        echo "|---------|---------|" >> $GITHUB_STEP_SUMMARY
+        jq -r 'to_entries | .[] | "| \(.key) | \(.value.licenses // "Unknown") |"' licenses.json | head -20 >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "</details>" >> $GITHUB_STEP_SUMMARY
+    
+    - name: Upload license report
+      uses: actions/upload-artifact@v4
+      with:
+        name: license-report
+        path: cppcheck-dashboard-generator/licenses.json
+        retention-days: 7
+
+  sast-analysis:
+    name: Static Application Security Testing
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Run Semgrep
+      uses: returntocorp/semgrep-action@v1
+      with:
+        config: >-
+          p/security-audit
+          p/nodejs
+          p/typescript
+          p/python
+        generateSarif: true
+    
+    - name: Upload SAST results
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: semgrep.sarif
+        category: 'sast'
+    
+    - name: Create security summary
+      if: always()
+      run: |
+        echo "### 🛡️ Security Scan Complete" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Security scans have been completed. Check the Security tab for detailed results." >> $GITHUB_STEP_SUMMARY

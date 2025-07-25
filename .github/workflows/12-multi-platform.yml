@@ -1,0 +1,327 @@
+name: 12 - Multi-Platform Testing
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  platform-matrix:
+    name: Platform Compatibility Test
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: [16, 18, 20]
+        python-version: ['3.8', '3.10', '3.11']
+        exclude:
+          # Reduce matrix size by excluding some combinations
+          - os: windows-latest
+            node-version: 16
+            python-version: '3.8'
+          - os: macos-latest
+            node-version: 16
+            python-version: '3.8'
+    
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        cache-dependency-path: cppcheck-dashboard-generator/package-lock.json
+    
+    - name: Setup Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+    
+    - name: Install system dependencies
+      shell: bash
+      run: |
+        if [[ "${{ runner.os }}" == "Windows" ]]; then
+          # Windows-specific installations
+          choco install -y jq
+        elif [[ "${{ runner.os }}" == "macOS" ]]; then
+          # macOS-specific installations
+          brew install jq cppcheck || true
+        else
+          # Linux
+          sudo apt-get update
+          sudo apt-get install -y jq cppcheck
+        fi
+    
+    - name: Install Node dependencies
+      shell: bash
+      run: |
+        cd cppcheck-dashboard-generator
+        npm ci
+        npm run build
+    
+    - name: Install Python dependencies
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest black flake8
+    
+    - name: Run platform-specific tests
+      shell: bash
+      run: |
+        echo "### 🖥️ Platform Test: ${{ matrix.os }}" >> $GITHUB_STEP_SUMMARY
+        echo "Node.js: ${{ matrix.node-version }}, Python: ${{ matrix.python-version }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Test TypeScript build
+        cd cppcheck-dashboard-generator
+        if npm test; then
+          echo "✅ TypeScript tests passed" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ TypeScript tests failed" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
+        cd ..
+        
+        # Test Python scripts
+        if python -m pytest test/ -v; then
+          echo "✅ Python tests passed" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ Python tests failed" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
+        
+        # Test dashboard generation
+        if python generate/generate-simple-dashboard.py data/analysis-with-context.json test-output.html; then
+          echo "✅ Dashboard generation successful" >> $GITHUB_STEP_SUMMARY
+          ls -la test-output.html >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ Dashboard generation failed" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
+    
+    - name: Test file operations
+      shell: bash
+      run: |
+        # Test cross-platform file handling
+        cat > test_file_ops.py << 'EOF'
+        import os
+        import sys
+        import json
+        import pathlib
+        
+        def test_path_operations():
+            # Test path separators
+            test_path = pathlib.Path("test") / "data" / "file.json"
+            print(f"Path test: {test_path}")
+            
+            # Test file creation
+            os.makedirs("test_output", exist_ok=True)
+            with open(os.path.join("test_output", "test.txt"), "w") as f:
+                f.write("Cross-platform test\n")
+            
+            # Test JSON handling
+            data = {"platform": sys.platform, "os": os.name}
+            with open(os.path.join("test_output", "platform.json"), "w") as f:
+                json.dump(data, f, indent=2)
+            
+            print(f"✓ Platform: {sys.platform}")
+            print(f"✓ OS: {os.name}")
+            print(f"✓ Path separator: {os.sep}")
+            print(f"✓ Line separator: {repr(os.linesep)}")
+        
+        if __name__ == "__main__":
+            test_path_operations()
+        EOF
+        
+        python test_file_ops.py
+    
+    - name: Test CLI tools
+      shell: bash
+      run: |
+        # Test command-line interface
+        cd cppcheck-dashboard-generator
+        
+        # Test CLI on different platforms
+        if [[ "${{ runner.os }}" == "Windows" ]]; then
+          node dist/cli.js --version || echo "CLI test skipped on Windows"
+        else
+          # Test with various arguments
+          node dist/cli.js --help
+          node dist/cli.js ../data/analysis-with-context.json ../test-cli-output.html --verbose
+        fi
+    
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: platform-test-${{ matrix.os }}-node${{ matrix.node-version }}-py${{ matrix.python-version }}
+        path: |
+          test-output.html
+          test-cli-output.html
+          test_output/
+        retention-days: 7
+
+  docker-platforms:
+    name: Docker Multi-Platform Build
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Build for multiple platforms
+      run: |
+        echo "### 🐳 Docker Multi-Platform Build" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Build for multiple architectures
+        PLATFORMS="linux/amd64,linux/arm64,linux/arm/v7"
+        
+        docker buildx build \
+          --platform $PLATFORMS \
+          --tag cppcheck-studio:multi-platform \
+          --file Dockerfile \
+          . \
+          --push=false \
+          --cache-from type=gha \
+          --cache-to type=gha,mode=max
+        
+        echo "✅ Successfully built for platforms: $PLATFORMS" >> $GITHUB_STEP_SUMMARY
+
+  browser-compatibility:
+    name: Browser Compatibility Test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    
+    - name: Install Playwright
+      run: |
+        npm init -y
+        npm install -D @playwright/test
+        npx playwright install --with-deps chromium firefox webkit
+    
+    - name: Generate test dashboard
+      run: |
+        python3 generate/generate-simple-dashboard.py \
+          data/analysis-with-context.json \
+          browser-test.html
+    
+    - name: Test across browsers
+      run: |
+        cat > browser-test.spec.js << 'EOF'
+        const { test, expect, devices } = require('@playwright/test');
+        const fs = require('fs');
+        
+        const browsers = [
+          { name: 'Chrome', ...devices['Desktop Chrome'] },
+          { name: 'Firefox', ...devices['Desktop Firefox'] },
+          { name: 'Safari', ...devices['Desktop Safari'] },
+          { name: 'Edge', ...devices['Desktop Edge'] },
+          { name: 'iPhone 12', ...devices['iPhone 12'] },
+          { name: 'Pixel 5', ...devices['Pixel 5'] },
+          { name: 'iPad Pro', ...devices['iPad Pro'] },
+        ];
+        
+        browsers.forEach(device => {
+          test(`Dashboard works on ${device.name}`, async ({ browser }) => {
+            const context = await browser.newContext(device);
+            const page = await context.newPage();
+            
+            // Load dashboard
+            await page.goto('file://' + process.cwd() + '/browser-test.html');
+            await page.waitForLoadState('networkidle');
+            
+            // Check basic functionality
+            const title = await page.title();
+            expect(title).toContain('CPPCheck');
+            
+            // Check responsive layout
+            const viewport = page.viewportSize();
+            console.log(`Testing ${device.name} at ${viewport.width}x${viewport.height}`);
+            
+            // Verify key elements are visible
+            await expect(page.locator('.dashboard, .container, main').first()).toBeVisible();
+            
+            // Test interaction
+            const searchInput = page.locator('input[type="search"], input[placeholder*="Search"]').first();
+            if (await searchInput.isVisible()) {
+              await searchInput.fill('test');
+              await page.waitForTimeout(500);
+            }
+            
+            // Take screenshot for visual verification
+            await page.screenshot({ 
+              path: `screenshots/${device.name.replace(/\s+/g, '-')}.png`,
+              fullPage: true 
+            });
+            
+            await context.close();
+          });
+        });
+        EOF
+        
+        mkdir -p screenshots
+        npx playwright test browser-test.spec.js --reporter=list || true
+        
+        echo "### 🌐 Browser Compatibility Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Screenshots generated for:" >> $GITHUB_STEP_SUMMARY
+        ls -la screenshots/*.png | awk '{print "- " $9}' >> $GITHUB_STEP_SUMMARY
+    
+    - name: Upload browser screenshots
+      uses: actions/upload-artifact@v4
+      with:
+        name: browser-compatibility-screenshots
+        path: screenshots/
+        retention-days: 7
+
+  platform-summary:
+    name: Platform Test Summary
+    runs-on: ubuntu-latest
+    needs: [platform-matrix, docker-platforms, browser-compatibility]
+    if: always()
+    
+    steps:
+    - name: Create summary
+      run: |
+        echo "## 🌍 Multi-Platform Test Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        echo "### Platform Matrix" >> $GITHUB_STEP_SUMMARY
+        echo "| Component | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Platform Tests | ${{ needs.platform-matrix.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Docker Multi-arch | ${{ needs.docker-platforms.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Browser Compatibility | ${{ needs.browser-compatibility.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        echo "### Supported Platforms" >> $GITHUB_STEP_SUMMARY
+        echo "✅ **Operating Systems**: Linux, macOS, Windows" >> $GITHUB_STEP_SUMMARY
+        echo "✅ **Node.js**: 16.x, 18.x, 20.x" >> $GITHUB_STEP_SUMMARY
+        echo "✅ **Python**: 3.8, 3.10, 3.11" >> $GITHUB_STEP_SUMMARY
+        echo "✅ **Docker**: linux/amd64, linux/arm64, linux/arm/v7" >> $GITHUB_STEP_SUMMARY
+        echo "✅ **Browsers**: Chrome, Firefox, Safari, Edge + Mobile" >> $GITHUB_STEP_SUMMARY

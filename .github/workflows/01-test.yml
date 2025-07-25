@@ -1,0 +1,242 @@
+name: 01 - Test Suite
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_call:
+    outputs:
+      coverage:
+        description: 'Test coverage percentage'
+        value: ${{ jobs.test-typescript.outputs.coverage }}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-typescript:
+    name: TypeScript Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      coverage: ${{ steps.coverage.outputs.percentage }}
+    
+    strategy:
+      matrix:
+        node-version: [16, 18, 20]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        cache-dependency-path: cppcheck-dashboard-generator/package-lock.json
+    
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.npm
+          cppcheck-dashboard-generator/node_modules
+        key: ${{ runner.os }}-node-${{ matrix.node-version }}-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-${{ matrix.node-version }}-
+          ${{ runner.os }}-node-
+    
+    - name: Install dependencies
+      run: |
+        cd cppcheck-dashboard-generator
+        npm ci --prefer-offline --no-audit
+    
+    - name: Run linter
+      run: |
+        cd cppcheck-dashboard-generator
+        npm run lint
+    
+    - name: Type check
+      run: |
+        cd cppcheck-dashboard-generator
+        npm run typecheck
+    
+    - name: Run tests with coverage
+      run: |
+        cd cppcheck-dashboard-generator
+        npm run test:coverage -- --ci --reporters=default --reporters=jest-junit
+      env:
+        JEST_JUNIT_OUTPUT_DIR: ./test-results
+        JEST_JUNIT_OUTPUT_NAME: junit.xml
+    
+    - name: Extract coverage
+      id: coverage
+      if: matrix.node-version == '18'
+      run: |
+        cd cppcheck-dashboard-generator
+        COVERAGE=$(cat coverage/coverage-summary.json | jq -r '.total.lines.pct')
+        echo "percentage=$COVERAGE" >> $GITHUB_OUTPUT
+        echo "### Test Coverage: ${COVERAGE}%" >> $GITHUB_STEP_SUMMARY
+    
+    - name: Upload coverage reports
+      if: matrix.node-version == '18'
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./cppcheck-dashboard-generator/coverage/lcov.info
+        flags: typescript
+        name: typescript-coverage
+    
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results-node-${{ matrix.node-version }}
+        path: cppcheck-dashboard-generator/test-results/
+        retention-days: 7
+
+  test-python:
+    name: Python Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.9', '3.10', '3.11']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+    
+    - name: Install test dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest pytest-cov pytest-xdist black flake8 mypy
+    
+    - name: Lint Python code
+      run: |
+        black --check generate/ scripts/ test/
+        flake8 generate/ scripts/ test/ --max-line-length=100
+    
+    - name: Type check Python
+      run: |
+        mypy generate/ scripts/ --ignore-missing-imports || true
+    
+    - name: Run Python tests
+      run: |
+        pytest test/ -v --cov=generate --cov=scripts --cov-report=xml --cov-report=term
+    
+    - name: Upload Python coverage
+      if: matrix.python-version == '3.10'
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.xml
+        flags: python
+        name: python-coverage
+
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: [test-typescript, test-python]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup environment
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: cppcheck-dashboard-generator/package-lock.json
+    
+    - name: Install cppcheck
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cppcheck
+        cppcheck --version
+    
+    - name: Build TypeScript package
+      run: |
+        cd cppcheck-dashboard-generator
+        npm ci
+        npm run build
+        sudo npm link
+    
+    - name: Run integration tests
+      run: |
+        # Test TypeScript generator
+        cd cppcheck-dashboard-generator
+        npm run example
+        test -f example-output.html
+        
+        # Test Python generators
+        cd ..
+        python3 generate/generate-standalone-virtual-dashboard.py \
+          data/analysis-with-context.json \
+          test-python-output.html
+        test -f test-python-output.html
+        
+        # Test with real cppcheck output
+        echo 'int main() { int* p = nullptr; *p = 5; }' > test.cpp
+        cppcheck --enable=all --xml --xml-version=2 test.cpp 2> test.xml
+        python3 xml2json-simple.py test.xml > test.json
+        python3 add-code-context.py test.json test-with-context.json
+        
+        # Generate dashboard with both implementations
+        cppcheck-dashboard test-with-context.json test-ts-dashboard.html
+        python3 generate/generate-ultimate-dashboard.py test-with-context.json test-py-dashboard.html
+        
+        # Verify outputs exist
+        ls -la *.html
+    
+    - name: Upload integration test artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: integration-test-outputs
+        path: |
+          *.html
+          test*.json
+        retention-days: 7
+
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [test-typescript, test-python, integration-test]
+    if: always()
+    
+    steps:
+    - name: Create summary
+      run: |
+        echo "## 🧪 Test Suite Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ needs.test-typescript.result }}" == "success" ]; then
+          echo "✅ **TypeScript Tests**: Passed" >> $GITHUB_STEP_SUMMARY
+          echo "   Coverage: ${{ needs.test-typescript.outputs.coverage }}%" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **TypeScript Tests**: ${{ needs.test-typescript.result }}" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ needs.test-python.result }}" == "success" ]; then
+          echo "✅ **Python Tests**: Passed" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Python Tests**: ${{ needs.test-python.result }}" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ needs.integration-test.result }}" == "success" ]; then
+          echo "✅ **Integration Tests**: Passed" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Integration Tests**: ${{ needs.integration-test.result }}" >> $GITHUB_STEP_SUMMARY
+        fi

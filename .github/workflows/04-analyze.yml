@@ -1,0 +1,134 @@
+name: 04 - Analyze Repository
+
+on:
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: 'GitHub repository to analyze (owner/repo)'
+        required: true
+        type: string
+      branch:
+        description: 'Branch to analyze'
+        required: false
+        type: string
+        default: ''
+      max_files:
+        description: 'Maximum files to analyze'
+        required: false
+        type: number
+        default: 500
+  repository_dispatch:
+    types: [analyze-repo]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+  actions: read
+
+jobs:
+  validate-input:
+    name: Validate Input
+    runs-on: ubuntu-latest
+    outputs:
+      repository: ${{ steps.parse.outputs.repository }}
+      branch: ${{ steps.parse.outputs.branch }}
+      max_files: ${{ steps.parse.outputs.max_files }}
+      analysis_id: ${{ steps.parse.outputs.analysis_id }}
+      callback_url: ${{ steps.parse.outputs.callback_url }}
+    
+    steps:
+    - name: Parse and validate inputs
+      id: parse
+      run: |
+        # Parse inputs based on trigger type
+        if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+          REPO="${{ github.event.client_payload.repository }}"
+          BRANCH="${{ github.event.client_payload.branch }}"
+          MAX_FILES="${{ github.event.client_payload.max_files }}"
+          CALLBACK_URL="${{ github.event.client_payload.callback_url }}"
+          ANALYSIS_ID="${{ github.event.client_payload.analysis_id }}"
+        else
+          REPO="${{ github.event.inputs.repository }}"
+          BRANCH="${{ github.event.inputs.branch }}"
+          MAX_FILES="${{ github.event.inputs.max_files }}"
+          CALLBACK_URL=""
+          ANALYSIS_ID=""
+        fi
+        
+        # Validate repository format
+        if [[ ! "$REPO" =~ ^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$ ]]; then
+          echo "❌ Invalid repository format: $REPO" >> $GITHUB_STEP_SUMMARY
+          echo "Expected format: owner/repo" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
+        
+        # Set defaults
+        BRANCH="${BRANCH:-}"
+        MAX_FILES="${MAX_FILES:-500}"
+        ANALYSIS_ID="${ANALYSIS_ID:-$(date +%s)-$(openssl rand -hex 4)}"
+        
+        # Output parsed values
+        echo "repository=$REPO" >> $GITHUB_OUTPUT
+        echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+        echo "max_files=$MAX_FILES" >> $GITHUB_OUTPUT
+        echo "analysis_id=$ANALYSIS_ID" >> $GITHUB_OUTPUT
+        echo "callback_url=$CALLBACK_URL" >> $GITHUB_OUTPUT
+        
+        # Summary
+        echo "### 📋 Analysis Request Validated" >> $GITHUB_STEP_SUMMARY
+        echo "- Repository: \`$REPO\`" >> $GITHUB_STEP_SUMMARY
+        echo "- Branch: \`${BRANCH:-default}\`" >> $GITHUB_STEP_SUMMARY
+        echo "- Max Files: $MAX_FILES" >> $GITHUB_STEP_SUMMARY
+        echo "- Analysis ID: \`$ANALYSIS_ID\`" >> $GITHUB_STEP_SUMMARY
+
+  analyze:
+    name: Run Analysis
+    needs: validate-input
+    uses: ./.github/workflows/reusable-analyze.yml
+    with:
+      repository: ${{ needs.validate-input.outputs.repository }}
+      branch: ${{ needs.validate-input.outputs.branch }}
+      max_files: ${{ fromJSON(needs.validate-input.outputs.max_files) }}
+      analysis_id: ${{ needs.validate-input.outputs.analysis_id }}
+      callback_url: ${{ needs.validate-input.outputs.callback_url }}
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+
+  notify-completion:
+    name: Notify Completion
+    runs-on: ubuntu-latest
+    needs: [validate-input, analyze]
+    if: always()
+    
+    steps:
+    - name: Create final summary
+      run: |
+        echo "# 🏁 Analysis Complete!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ needs.analyze.result }}" == "success" ]; then
+          echo "## ✅ Success!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Dashboard**: [${{ needs.analyze.outputs.analysis_id }}](${{ needs.analyze.outputs.dashboard_url }})" >> $GITHUB_STEP_SUMMARY
+          echo "- **Issues Found**: ${{ needs.analyze.outputs.issues_found }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Repository**: \`${{ needs.validate-input.outputs.repository }}\`" >> $GITHUB_STEP_SUMMARY
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Quick Links" >> $GITHUB_STEP_SUMMARY
+          echo "- [View Dashboard](${{ needs.analyze.outputs.dashboard_url }})" >> $GITHUB_STEP_SUMMARY
+          echo "- [API Status](https://jerryzhao173985.github.io/cppcheck-studio/api/status/${{ needs.analyze.outputs.analysis_id }}.json)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Download Artifacts](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts)" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "## ❌ Analysis Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The analysis for \`${{ needs.validate-input.outputs.repository }}\` failed." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "[View Logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "---" >> $GITHUB_STEP_SUMMARY
+        echo "*Analysis ID: \`${{ needs.validate-input.outputs.analysis_id }}\`*" >> $GITHUB_STEP_SUMMARY

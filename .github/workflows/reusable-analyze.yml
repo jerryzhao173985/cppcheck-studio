@@ -1,0 +1,330 @@
+name: Reusable - Analyze Repository
+
+on:
+  workflow_call:
+    inputs:
+      repository:
+        description: 'GitHub repository to analyze (owner/repo)'
+        required: true
+        type: string
+      branch:
+        description: 'Branch to analyze'
+        required: false
+        type: string
+        default: ''
+      max_files:
+        description: 'Maximum files to analyze'
+        required: false
+        type: number
+        default: 500
+      analysis_id:
+        description: 'Unique analysis ID'
+        required: false
+        type: string
+        default: ''
+      callback_url:
+        description: 'URL to POST results when complete'
+        required: false
+        type: string
+        default: ''
+    outputs:
+      analysis_id:
+        description: 'The analysis ID used'
+        value: ${{ jobs.analyze.outputs.analysis_id }}
+      dashboard_url:
+        description: 'URL to the generated dashboard'
+        value: ${{ jobs.analyze.outputs.dashboard_url }}
+      issues_found:
+        description: 'Number of issues found'
+        value: ${{ jobs.analyze.outputs.issues_found }}
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  analyze:
+    name: Analyze C++ Repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      analysis_id: ${{ steps.setup.outputs.analysis_id }}
+      dashboard_url: ${{ steps.deploy.outputs.dashboard_url }}
+      issues_found: ${{ steps.analysis.outputs.issues_found }}
+    
+    steps:
+    - name: Setup analysis
+      id: setup
+      run: |
+        # Generate or use provided analysis ID
+        if [ -n "${{ inputs.analysis_id }}" ]; then
+          ANALYSIS_ID="${{ inputs.analysis_id }}"
+        else
+          ANALYSIS_ID="$(date +%s)-$(openssl rand -hex 4)"
+        fi
+        echo "analysis_id=$ANALYSIS_ID" >> $GITHUB_OUTPUT
+        
+        # Determine branch
+        if [ -z "${{ inputs.branch }}" ]; then
+          DEFAULT_BRANCH=$(curl -s https://api.github.com/repos/${{ inputs.repository }} | jq -r .default_branch)
+          BRANCH=${DEFAULT_BRANCH:-main}
+        else
+          BRANCH="${{ inputs.branch }}"
+        fi
+        echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+        
+        echo "### 🎯 Analysis Configuration" >> $GITHUB_STEP_SUMMARY
+        echo "- **Repository**: \`${{ inputs.repository }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "- **Branch**: \`$BRANCH\`" >> $GITHUB_STEP_SUMMARY
+        echo "- **Analysis ID**: \`$ANALYSIS_ID\`" >> $GITHUB_STEP_SUMMARY
+        echo "- **Max Files**: ${{ inputs.max_files }}" >> $GITHUB_STEP_SUMMARY
+    
+    - name: Checkout CPPCheck Studio
+      uses: actions/checkout@v4
+      with:
+        path: cppcheck-studio
+    
+    - name: Setup environment
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: cppcheck-studio/cppcheck-dashboard-generator/package-lock.json
+    
+    - name: Cache cppcheck
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/cppcheck
+          /usr/local/bin/cppcheck
+        key: ${{ runner.os }}-cppcheck-${{ hashFiles('/etc/os-release') }}
+        restore-keys: |
+          ${{ runner.os }}-cppcheck-
+    
+    - name: Install dependencies
+      run: |
+        # Install cppcheck if not cached
+        if ! command -v cppcheck &> /dev/null; then
+          sudo apt-get update
+          sudo apt-get install -y cppcheck
+        fi
+        cppcheck --version
+        
+        # Build dashboard generator
+        cd cppcheck-studio/cppcheck-dashboard-generator
+        npm ci --prefer-offline --no-audit
+        npm run build
+        sudo npm link --force
+        cd ../..
+    
+    - name: Cache repository clones
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/cppcheck-studio/repos
+        key: ${{ runner.os }}-repo-${{ inputs.repository }}-${{ steps.setup.outputs.branch }}
+        restore-keys: |
+          ${{ runner.os }}-repo-${{ inputs.repository }}-
+    
+    - name: Clone and prepare repository
+      id: clone
+      run: |
+        REPO_CACHE="$HOME/.cache/cppcheck-studio/repos"
+        mkdir -p "$REPO_CACHE"
+        
+        REPO_NAME=$(echo "${{ inputs.repository }}" | tr '/' '_')
+        REPO_PATH="$REPO_CACHE/$REPO_NAME"
+        
+        if [ -d "$REPO_PATH/.git" ]; then
+          echo "📦 Using cached repository, updating..."
+          cd "$REPO_PATH"
+          git fetch origin "${{ steps.setup.outputs.branch }}" --depth=1
+          git checkout -f FETCH_HEAD
+        else
+          echo "📦 Cloning repository..."
+          git clone --depth 1 --branch "${{ steps.setup.outputs.branch }}" \
+            "https://github.com/${{ inputs.repository }}.git" "$REPO_PATH"
+          cd "$REPO_PATH"
+        fi
+        
+        COMMIT_SHA=$(git rev-parse --short HEAD)
+        echo "commit_sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+        echo "repo_path=$REPO_PATH" >> $GITHUB_OUTPUT
+        
+        # Find C++ files efficiently
+        find . -type f \( -name "*.cpp" -o -name "*.cc" -o -name "*.cxx" -o -name "*.c" -o -name "*.h" -o -name "*.hpp" \) \
+          -not -path "*/build/*" \
+          -not -path "*/.git/*" \
+          -not -path "*/vendor/*" \
+          -not -path "*/third_party/*" \
+          -not -path "*/node_modules/*" \
+          | head -n ${{ inputs.max_files }} > cpp_files.txt
+        
+        FILE_COUNT=$(wc -l < cpp_files.txt)
+        echo "file_count=$FILE_COUNT" >> $GITHUB_OUTPUT
+        
+        if [ "$FILE_COUNT" -eq 0 ]; then
+          echo "❌ No C++ files found!" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
+        
+        echo "✅ Found $FILE_COUNT C++ files" >> $GITHUB_STEP_SUMMARY
+    
+    - name: Run cppcheck analysis
+      id: analysis
+      run: |
+        cd "${{ steps.clone.outputs.repo_path }}"
+        
+        # Run cppcheck with optimal settings
+        cppcheck \
+          --enable=all \
+          --inconclusive \
+          --suppress=missingIncludeSystem \
+          --suppress=unmatchedSuppression \
+          --std=c++17 \
+          --xml \
+          --xml-version=2 \
+          --file-list=cpp_files.txt \
+          -j $(nproc) \
+          --max-configs=1 \
+          --platform=unix64 \
+          2> cppcheck-results.xml || true
+        
+        # Convert to JSON
+        python3 "$GITHUB_WORKSPACE/cppcheck-studio/xml2json-simple.py" \
+          cppcheck-results.xml > analysis.json
+        
+        # Add code context
+        python3 "$GITHUB_WORKSPACE/cppcheck-studio/add-code-context.py" \
+          analysis.json analysis-with-context.json
+        
+        # Get issue count
+        ISSUE_COUNT=$(python3 -c "import json; print(len(json.load(open('analysis.json'))['issues']))")
+        echo "issues_found=$ISSUE_COUNT" >> $GITHUB_OUTPUT
+        
+        echo "### 📊 Analysis Results" >> $GITHUB_STEP_SUMMARY
+        echo "- **Total Issues**: $ISSUE_COUNT" >> $GITHUB_STEP_SUMMARY
+        
+        # Move results to workspace
+        cp analysis-with-context.json "$GITHUB_WORKSPACE/"
+        cp analysis.json "$GITHUB_WORKSPACE/"
+    
+    - name: Generate dashboard
+      run: |
+        # Use the virtual scrolling dashboard (best implementation with all features)
+        if [ -f cppcheck-studio/generate/generate-standalone-virtual-dashboard.py ]; then
+          echo "Using virtual scrolling dashboard generator (recommended)..."
+          python3 cppcheck-studio/generate/generate-standalone-virtual-dashboard.py \
+            analysis-with-context.json \
+            dashboard.html
+        elif [ -f cppcheck-studio/generate/generate-ultimate-dashboard.py ]; then
+          echo "Using ultimate dashboard generator..."
+          python3 cppcheck-studio/generate/generate-ultimate-dashboard.py \
+            analysis-with-context.json \
+            dashboard.html
+        elif command -v cppcheck-dashboard &> /dev/null; then
+          echo "Using TypeScript dashboard generator..."
+          cppcheck-dashboard \
+            analysis-with-context.json \
+            dashboard.html \
+            --title "${{ inputs.repository }} Analysis" \
+            --project "${{ inputs.repository }} (${{ steps.clone.outputs.commit_sha }})"
+        else
+          echo "Using simple dashboard generator (fallback)..."
+          python3 cppcheck-studio/generate/generate-simple-dashboard.py \
+            analysis-with-context.json \
+            dashboard.html
+        fi
+        
+        # Generate additional reports
+        python3 cppcheck-studio/scripts/generate-summary.py analysis.json > summary.txt
+        python3 cppcheck-studio/scripts/generate-detailed-report.py analysis.json > report.md
+        
+        # Create metadata
+        cat > metadata.json << EOF
+        {
+          "analysis_id": "${{ steps.setup.outputs.analysis_id }}",
+          "repository": "${{ inputs.repository }}",
+          "branch": "${{ steps.setup.outputs.branch }}",
+          "commit": "${{ steps.clone.outputs.commit_sha }}",
+          "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "files_analyzed": ${{ steps.clone.outputs.file_count }},
+          "issues_found": ${{ steps.analysis.outputs.issues_found }},
+          "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/${{ steps.setup.outputs.analysis_id }}/index.html"
+        }
+        EOF
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: analysis-${{ steps.setup.outputs.analysis_id }}
+        path: |
+          dashboard.html
+          summary.txt
+          report.md
+          metadata.json
+          analysis.json
+          analysis-with-context.json
+        retention-days: 30
+    
+    - name: Deploy results
+      id: deploy
+      if: github.ref == 'refs/heads/main'
+      run: |
+        # Setup git
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        
+        # Clone with token
+        git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git deploy-repo
+        cd deploy-repo
+        
+        # Create result directories
+        mkdir -p docs/results/${{ steps.setup.outputs.analysis_id }}
+        mkdir -p docs/api/analyses
+        mkdir -p docs/api/status
+        
+        # Copy results
+        cp ../dashboard.html docs/results/${{ steps.setup.outputs.analysis_id }}/index.html
+        cp ../metadata.json docs/results/${{ steps.setup.outputs.analysis_id }}/
+        cp ../metadata.json docs/api/analyses/${{ steps.setup.outputs.analysis_id }}.json
+        
+        # Update gallery
+        if [ -f docs/api/gallery.json ]; then
+          jq --argjson new "$(cat ../metadata.json)" \
+            '.analyses = ([$new] + .analyses | unique_by(.analysis_id) | .[0:50])' \
+            docs/api/gallery.json > temp.json
+          mv temp.json docs/api/gallery.json
+        else
+          jq -n --argjson metadata "$(cat ../metadata.json)" \
+            '{analyses: [$metadata]}' > docs/api/gallery.json
+        fi
+        
+        # Create status
+        cat > docs/api/status/${{ steps.setup.outputs.analysis_id }}.json << EOF
+        {
+          "analysis_id": "${{ steps.setup.outputs.analysis_id }}",
+          "status": "completed",
+          "dashboard_url": "https://jerryzhao173985.github.io/cppcheck-studio/results/${{ steps.setup.outputs.analysis_id }}/index.html"
+        }
+        EOF
+        
+        # Commit and push
+        git add docs/
+        git commit -m "Add analysis results for ${{ inputs.repository }} (#${{ steps.setup.outputs.analysis_id }})"
+        git push
+        
+        DASHBOARD_URL="https://jerryzhao173985.github.io/cppcheck-studio/results/${{ steps.setup.outputs.analysis_id }}/index.html"
+        echo "dashboard_url=$DASHBOARD_URL" >> $GITHUB_OUTPUT
+        
+        echo "### 🎉 Dashboard Published!" >> $GITHUB_STEP_SUMMARY
+        echo "[View Dashboard]($DASHBOARD_URL)" >> $GITHUB_STEP_SUMMARY
+    
+    - name: Send callback
+      if: inputs.callback_url != ''
+      run: |
+        curl -X POST "${{ inputs.callback_url }}" \
+          -H "Content-Type: application/json" \
+          -d @metadata.json \
+          --fail-with-body \
+          || echo "Callback failed"

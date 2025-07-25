@@ -1,181 +1,270 @@
-# GitHub Actions Workflows for CPPCheck Studio
+# GitHub Actions Workflows
 
-This directory contains GitHub Actions workflows that automatically run CPPCheck analysis on C++ repositories and generate interactive HTML dashboards.
+This directory contains the CI/CD workflows for CPPCheck Studio. The workflows have been reorganized for better maintainability and performance.
 
-## Available Workflows
+## 🏗️ Workflow Structure
 
-### 1. CPPCheck Analysis Dashboard (`cppcheck-analysis.yml`)
+### Core Workflows (Numbered for Order)
 
-**Trigger**: Push to main/develop, Pull Requests, Manual dispatch
+1. **`01-test.yml`** - Comprehensive test suite
+   - TypeScript tests with coverage
+   - Python linting and testing
+   - Integration tests
+   - Matrix testing across Node/Python versions
 
-This workflow analyzes the current repository (if it contains C++ files) or an external repository.
+2. **`02-security.yml`** - Security scanning
+   - Dependency vulnerability scanning (Trivy)
+   - Code security analysis (CodeQL)
+   - Secret detection (TruffleHog, Gitleaks)
+   - License compliance checks
+   - SAST with Semgrep
 
-**Features**:
-- Automatic analysis on push/PR
-- Generates interactive HTML dashboard
-- Uploads artifacts for download
-- Posts PR comments with results
-- Optional GitHub Pages deployment
+3. **`03-build.yml`** - Build and validation
+   - TypeScript package building
+   - Python script validation
+   - Workflow file validation
+   - Format checking
 
-**Usage**:
-```yaml
-# Triggered automatically on push/PR
-# Or manually with optional repo URL
-```
+4. **`04-analyze.yml`** - Repository analysis
+   - Main entry point for C++ analysis
+   - Validates inputs and calls reusable workflow
+   - Handles both manual and API triggers
 
-### 2. Analyze External C++ Repository (`analyze-cpp-repo.yml`)
+5. **`05-release.yml`** - Automated releases
+   - Semantic versioning
+   - NPM publishing
+   - GitHub releases
+   - Release notes generation
 
-**Trigger**: Manual dispatch only
+6. **`06-monitoring.yml`** - Metrics and health
+   - Workflow performance metrics
+   - Health checks
+   - Failure alerts
+   - Resource usage tracking
 
-Analyze any public C++ repository on GitHub.
+7. **`07-e2e-tests.yml`** - End-to-end testing
+   - Playwright browser tests
+   - Visual regression testing
+   - Multi-browser support
+   - Accessibility checks
 
-**Inputs**:
-- `repository`: GitHub repository in `owner/repo` format (e.g., `opencv/opencv`)
-- `branch`: Branch to analyze (default: `main`)
-- `path`: Subdirectory to analyze (optional)
-- `max_files`: Maximum files to analyze (default: 100)
+8. **`08-performance.yml`** - Performance testing
+   - Analysis benchmarking
+   - Dashboard load time testing
+   - Performance regression detection
+   - Stress testing
 
-**Example**:
-1. Go to Actions tab
-2. Select "Analyze External C++ Repository"
-3. Click "Run workflow"
-4. Enter repository details
-5. Download the generated dashboard from artifacts
+9. **`09-api-tests.yml`** - API testing
+   - Endpoint validation
+   - JSON schema validation
+   - Contract testing
+   - Security testing
 
-### 3. Example C++ Project Analysis (`example-analysis.yml`)
+10. **`10-preview-deploy.yml`** - PR preview deployments
+    - Automatic preview environments
+    - Lighthouse analysis
+    - Preview cleanup on PR close
+    - Deployment status tracking
 
-**Trigger**: Weekly schedule or manual dispatch
+11. **`11-changelog.yml`** - Changelog management
+    - Automated changelog generation
+    - Release notes creation
+    - Conventional commits parsing
+    - PR-based changelog updates
 
-Analyzes popular C++ projects as examples:
-- JSON for Modern C++
-- Catch2
-- fmt
-- spdlog
+12. **`12-multi-platform.yml`** - Cross-platform testing
+    - Windows, Linux, macOS testing
+    - Multi-version Node.js/Python
+    - Docker multi-arch builds
+    - Browser compatibility matrix
 
-## Dashboard Features
+13. **`13-cost-tracking.yml`** - Cost optimization
+    - Actions usage tracking
+    - Cost analysis and reporting
+    - Cache optimization
+    - Performance metrics
 
-The generated HTML dashboards include:
-- 📊 **Virtual Scrolling**: Handle thousands of issues efficiently
-- 🔍 **Search & Filter**: Find issues by file, message, or severity
-- 📝 **Code Context**: View the actual code around each issue
-- 🎨 **Syntax Highlighting**: Beautiful code display
-- 📱 **Responsive**: Works on all devices
-- 💾 **Standalone**: Single HTML file, works offline
+### Orchestrator Workflows
 
-## Setup Instructions
+- **`main-ci.yml`** - Main branch CI pipeline
+  - Runs test → security → build → deploy
+  - Handles GitHub Pages deployment
+  - Checks for releases
 
-### For Your Own Repository
+- **`pr-ci.yml`** - Pull request validation
+  - PR title validation
+  - Size checks
+  - Runs all tests
+  - Posts status comments
 
-1. Copy the `.github/workflows` directory to your C++ repository
-2. Ensure your repository has C++ files (`.cpp`, `.h`, etc.)
-3. Push to main branch or create a PR
-4. Check the Actions tab for results
+### Utility Workflows
 
-### Required Secrets
+- **`scheduled-maintenance.yml`** - Automated cleanup
+  - Artifact cleanup
+  - Cache management
+  - Old results removal
+  - Dependency updates
 
-No secrets required! The workflows use the automatic `GITHUB_TOKEN`.
+- **`reusable-analyze.yml`** - Reusable analysis logic
+  - Core C++ analysis implementation
+  - Used by multiple entry points
+  - Optimized with caching
 
-### Optional: GitHub Pages Deployment
+### Legacy Workflows
 
-To enable automatic deployment to GitHub Pages:
+The following workflows are the original implementation and should be migrated to use the new structure:
 
-1. Go to Settings → Pages
-2. Set Source to "GitHub Actions"
-3. The dashboard will be available at: `https://[username].github.io/[repo]/`
+- `analyze-on-demand.yml` → Use `04-analyze.yml` instead
+- `analyze-on-demand-v2.yml` → Merged into `reusable-analyze.yml`
+- `process-analysis-request.yml` → Still active for queue processing
+- `update-analysis-gallery.yml` → Integrated into `reusable-analyze.yml`
+- Other analysis variants → All consolidated
 
-## Example Usage
+## 🚀 Key Improvements
 
-### Analyzing a Pull Request
+### Performance Optimizations
+- **Caching everywhere**: npm, pip, cppcheck, repository clones
+- **Parallel execution**: Matrix builds, concurrent jobs
+- **Conditional execution**: Skip unchanged components
+- **Artifact reuse**: Share build outputs between jobs
+- **Multi-platform testing**: Concurrent OS/version testing
+- **Performance benchmarking**: Track and prevent regressions
 
-When you create a PR with C++ changes:
-1. The workflow runs automatically
-2. Downloads and analyzes your code
-3. Generates a dashboard
-4. Posts a comment with results and download link
+### Security Enhancements
+- **Multiple scanners**: Trivy, CodeQL, Semgrep, Gitleaks, TruffleHog
+- **Automated dependency updates**: Via Dependabot
+- **License compliance**: Automated checking
+- **Secret detection**: Multiple tools for redundancy
+- **Container security**: Docker image scanning
+- **API security testing**: OWASP compliance checks
 
-### Analyzing External Project
+### Developer Experience
+- **PR comments**: Automated status updates with detailed results
+- **Preview deployments**: Test changes before merge
+- **Job summaries**: Rich markdown summaries
+- **Clear naming**: Numbered workflows show execution order
+- **Reusable workflows**: DRY principle applied
+- **Pre-commit hooks**: Catch issues before push
+- **E2E testing**: Full browser automation
 
+### Monitoring & Observability
+- **Performance metrics**: Track workflow duration and success rates
+- **Health checks**: Detect stuck workflows
+- **Resource tracking**: Monitor Actions minutes usage
+- **Failure alerts**: Automated notifications
+- **Cost tracking**: Weekly cost reports and optimization
+- **Visual regression**: Screenshot comparisons
+- **Lighthouse scores**: Performance monitoring
+
+## 📋 Usage Examples
+
+### Running Analysis
 ```bash
-# Via GitHub UI:
-1. Go to Actions → "Analyze External C++ Repository"
-2. Click "Run workflow"
-3. Enter: repository: "google/googletest"
-4. Wait for completion
-5. Download dashboard artifact
+# Via GitHub UI
+# Go to Actions → 04 - Analyze Repository → Run workflow
+
+# Via GitHub CLI
+gh workflow run 04-analyze.yml -f repository="owner/repo" -f max_files=1000
+
+# Via API
+curl -X POST \
+  -H "Authorization: token $GITHUB_TOKEN" \
+  -H "Accept: application/vnd.github.v3+json" \
+  https://api.github.com/repos/jerryzhao173985/cppcheck-studio/dispatches \
+  -d '{"event_type":"analyze-repo","client_payload":{"repository":"owner/repo"}}'
 ```
 
-### Viewing Results
-
-1. Go to the workflow run
-2. Scroll to "Artifacts"
-3. Download `cppcheck-dashboard`
-4. Open the HTML file in your browser
-5. Explore the interactive dashboard!
-
-## Dashboard Navigation
-
-- **Search Bar**: Type to filter issues in real-time
-- **Severity Filters**: Click buttons to show/hide by severity
-- **Code Preview**: Click the 👁️ icon to see code context
-- **Virtual Scroll**: Smoothly handle large result sets
-
-## Customization
-
-### Modify Analysis Settings
-
-Edit the cppcheck command in the workflow:
-```yaml
-cppcheck \
-  --enable=all \              # Enable all checks
-  --std=c++17 \              # C++ standard
-  --suppress=missingInclude \ # Suppress specific warnings
-  ...
+### Manual Release
+```bash
+# Trigger a release
+gh workflow run 05-release.yml -f release_type=minor -f dry_run=false
 ```
 
-### Change Dashboard Title
-
-```yaml
-cppcheck-dashboard \
-  analysis.json \
-  dashboard.html \
-  --title "My Custom Title" \
-  --project "My Project Name"
+### Maintenance
+```bash
+# Run maintenance tasks
+gh workflow run scheduled-maintenance.yml \
+  -f cleanup_artifacts=true \
+  -f cleanup_caches=true \
+  -f retention_days=7
 ```
 
-## Troubleshooting
+## 🔧 Configuration
 
-### No C++ Files Found
-- Ensure your repository contains `.cpp`, `.h`, or similar files
-- Check the `path` parameter if analyzing subdirectories
+### Secrets Required
+- `GITHUB_TOKEN` - Automatically provided by GitHub Actions
+- `NPM_TOKEN` - For publishing to npm (optional, only needed if using `05-release.yml`)
 
-### Large Repositories
-- Increase `max_files` parameter (may take longer)
-- Or focus on specific directories with `path` parameter
+### Important Notes
+- Most workflows function without additional secrets
+- NPM_TOKEN is only required for automated npm publishing
+- All other tokens are optional for enhanced features
 
-### Dashboard Not Loading
-- Ensure JavaScript is enabled in your browser
-- Try a different browser if issues persist
+### Dashboard Generation
+The CI uses **`generate-standalone-virtual-dashboard.py`** as the primary dashboard generator because it:
+- Provides virtual scrolling for handling large datasets efficiently
+- Has all the features and correct implementation
+- Delivers the best user experience
+- Is the recommended and preferred dashboard format
 
-## Examples
+### Environment Variables
+- Set in workflow files directly
+- No additional configuration needed
 
-### Popular C++ Projects to Try
+### Permissions
+- Workflows use minimal required permissions
+- Elevated permissions only when necessary
+- Fine-grained per-job permissions
 
-- `nlohmann/json` - JSON for Modern C++
-- `google/googletest` - Google Test Framework  
-- `opencv/opencv` - Computer Vision Library
-- `pytorch/pytorch` - Machine Learning Framework
-- `tensorflow/tensorflow` - Machine Learning Platform
-- `catchorg/Catch2` - Test Framework
-- `fmtlib/fmt` - Formatting Library
+## 📊 Workflow Dependencies
 
-## Contributing
+```mermaid
+graph TD
+    A[Push to main] --> B[main-ci.yml]
+    B --> C[01-test.yml]
+    B --> D[02-security.yml]
+    C --> E[03-build.yml]
+    E --> F[Deploy Pages]
+    E --> G[05-release.yml]
+    
+    H[Pull Request] --> I[pr-ci.yml]
+    I --> C
+    I --> D
+    I --> E
+    
+    J[Manual/API] --> K[04-analyze.yml]
+    K --> L[reusable-analyze.yml]
+    
+    M[Schedule] --> N[scheduled-maintenance.yml]
+    M --> O[06-monitoring.yml]
+```
 
-To improve these workflows:
-1. Fork the repository
-2. Modify workflows in `.github/workflows/`
-3. Test on your fork
-4. Submit a pull request
+## 🐛 Troubleshooting
 
-## License
+### Common Issues
 
-These workflows are part of CPPCheck Studio and are MIT licensed.
+1. **Workflow not running**
+   - Check workflow permissions
+   - Verify branch protection rules
+   - Check concurrency settings
+
+2. **Cache misses**
+   - Verify cache keys
+   - Check restore-keys fallback
+   - Monitor cache size limits
+
+3. **Test failures**
+   - Check matrix combinations
+   - Verify environment setup
+   - Review dependency versions
+
+4. **Security scan failures**
+   - Review vulnerability reports
+   - Update dependencies
+   - Check scan configurations
+
+## 📚 Additional Resources
+
+- [GitHub Actions Documentation](https://docs.github.com/actions)
+- [Workflow syntax reference](https://docs.github.com/actions/reference/workflow-syntax-for-github-actions)
+- [Best practices](https://docs.github.com/actions/guides/best-practices-for-github-actions)

@@ -1,0 +1,375 @@
+name: 08 - Performance Testing
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 3 * * 1'  # Weekly on Monday at 3 AM
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  benchmark-analysis:
+    name: Analysis Performance Benchmark
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup environment
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: cppcheck-dashboard-generator/package-lock.json
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cppcheck time
+        
+        cd cppcheck-dashboard-generator
+        npm ci
+        npm run build
+        cd ..
+    
+    - name: Prepare test data
+      run: |
+        # Create test C++ files of various sizes
+        mkdir -p benchmark-tests
+        
+        # Small project (10 files)
+        for i in {1..10}; do
+          cat > benchmark-tests/small_$i.cpp << 'EOF'
+        #include <iostream>
+        #include <vector>
+        class Test$i {
+          int* ptr;
+        public:
+          Test$i() { ptr = new int[10]; }
+          void method() { delete ptr; }  // Should be delete[]
+        };
+        EOF
+        done
+        
+        # Medium project (100 files)
+        for i in {1..100}; do
+          cat > benchmark-tests/medium_$i.cpp << 'EOF'
+        #include <string>
+        void function$i() {
+          int* p = nullptr;
+          if (p != nullptr) { *p = 5; }
+          char buffer[10];
+          sprintf(buffer, "Very long string that will overflow");
+        }
+        EOF
+        done
+        
+        # Large file with many issues
+        python3 -c "
+        with open('benchmark-tests/large.cpp', 'w') as f:
+            f.write('#include <iostream>\\n')
+            for i in range(1000):
+                f.write(f'void func{i}() {{ int* p = new int; }}\\n')
+                f.write(f'class Class{i} {{ int x; public: Class{i}() {{}} }};\\n')
+        "
+    
+    - name: Run performance benchmarks
+      run: |
+        echo "### ⚡ Performance Benchmark Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Test Case | Files | Analysis Time | Dashboard Time | Total Time |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----------|-------|---------------|----------------|------------|" >> $GITHUB_STEP_SUMMARY
+        
+        # Benchmark function
+        benchmark() {
+          local name=$1
+          local files=$2
+          
+          # Run cppcheck
+          ANALYSIS_START=$(date +%s.%N)
+          cppcheck --enable=all --xml --xml-version=2 $files 2> $name.xml
+          ANALYSIS_END=$(date +%s.%N)
+          ANALYSIS_TIME=$(echo "$ANALYSIS_END - $ANALYSIS_START" | bc)
+          
+          # Convert to JSON
+          python3 xml2json-simple.py $name.xml > $name.json
+          
+          # Generate dashboard
+          DASHBOARD_START=$(date +%s.%N)
+          python3 generate/generate-simple-dashboard.py $name.json $name.html
+          DASHBOARD_END=$(date +%s.%N)
+          DASHBOARD_TIME=$(echo "$DASHBOARD_END - $DASHBOARD_START" | bc)
+          
+          TOTAL_TIME=$(echo "$ANALYSIS_TIME + $DASHBOARD_TIME" | bc)
+          
+          # File count
+          FILE_COUNT=$(echo $files | tr ' ' '\n' | wc -l)
+          
+          echo "| $name | $FILE_COUNT | ${ANALYSIS_TIME}s | ${DASHBOARD_TIME}s | ${TOTAL_TIME}s |" >> $GITHUB_STEP_SUMMARY
+        }
+        
+        # Run benchmarks
+        benchmark "Small Project" "benchmark-tests/small_*.cpp"
+        benchmark "Medium Project" "benchmark-tests/medium_*.cpp"
+        benchmark "Large File" "benchmark-tests/large.cpp"
+        benchmark "All Files" "benchmark-tests/*.cpp"
+    
+    - name: Dashboard load time testing
+      run: |
+        # Install Puppeteer for browser testing
+        npm install puppeteer
+        
+        cat > test-load-time.js << 'EOF'
+        const puppeteer = require('puppeteer');
+        const fs = require('fs');
+        
+        async function measureLoadTime(file, name) {
+          const browser = await puppeteer.launch({ headless: 'new' });
+          const page = await browser.newPage();
+          
+          // Measure metrics
+          await page.evaluateOnNewDocument(() => {
+            window.performance.mark('start');
+          });
+          
+          const metrics = [];
+          
+          // Run multiple times for accuracy
+          for (let i = 0; i < 3; i++) {
+            const startTime = Date.now();
+            await page.goto(`file://${process.cwd()}/${file}`, { waitUntil: 'networkidle0' });
+            const loadTime = Date.now() - startTime;
+            
+            const performanceMetrics = await page.evaluate(() => {
+              window.performance.mark('end');
+              window.performance.measure('pageLoad', 'start', 'end');
+              const measure = window.performance.getEntriesByName('pageLoad')[0];
+              
+              return {
+                loadTime: measure.duration,
+                domContentLoaded: performance.timing.domContentLoadedEventEnd - performance.timing.navigationStart,
+                firstPaint: performance.getEntriesByName('first-paint')[0]?.startTime || 0,
+                memoryUsed: performance.memory?.usedJSHeapSize || 0,
+              };
+            });
+            
+            metrics.push({ loadTime, ...performanceMetrics });
+          }
+          
+          await browser.close();
+          
+          // Calculate averages
+          const avg = metrics.reduce((acc, m) => {
+            Object.keys(m).forEach(key => {
+              acc[key] = (acc[key] || 0) + m[key] / metrics.length;
+            });
+            return acc;
+          }, {});
+          
+          return { name, ...avg };
+        }
+        
+        async function runTests() {
+          const results = [];
+          
+          if (fs.existsSync('Small Project.html')) {
+            results.push(await measureLoadTime('Small Project.html', 'Small Project'));
+          }
+          if (fs.existsSync('Medium Project.html')) {
+            results.push(await measureLoadTime('Medium Project.html', 'Medium Project'));
+          }
+          if (fs.existsSync('Large File.html')) {
+            results.push(await measureLoadTime('Large File.html', 'Large File'));
+          }
+          
+          // Output results
+          console.log('PERFORMANCE_RESULTS:' + JSON.stringify(results));
+        }
+        
+        runTests().catch(console.error);
+        EOF
+        
+        node test-load-time.js > load-results.txt
+        
+        # Parse and add to summary
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🌐 Dashboard Load Performance" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Dashboard | Load Time | DOM Ready | First Paint | Memory Used |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----------|-----------|-----------|-------------|-------------|" >> $GITHUB_STEP_SUMMARY
+        
+        if grep -q "PERFORMANCE_RESULTS:" load-results.txt; then
+          node -e "
+          const data = JSON.parse(process.argv[1]);
+          data.forEach(d => {
+            console.log(\`| \${d.name} | \${d.loadTime.toFixed(0)}ms | \${d.domContentLoaded.toFixed(0)}ms | \${d.firstPaint.toFixed(0)}ms | \${(d.memoryUsed/1024/1024).toFixed(1)}MB |\`);
+          });
+          " "$(grep "PERFORMANCE_RESULTS:" load-results.txt | cut -d: -f2-)" >> $GITHUB_STEP_SUMMARY
+        fi
+    
+    - name: Memory usage analysis
+      run: |
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 💾 Memory Usage Analysis" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Test with different issue counts
+        for count in 100 1000 5000 10000; do
+          # Generate test data
+          python3 -c "
+        import json
+        issues = []
+        for i in range($count):
+            issues.append({
+                'id': f'issue_{i}',
+                'severity': ['error', 'warning', 'style', 'performance'][i % 4],
+                'message': f'Test issue {i}',
+                'file': f'file_{i % 100}.cpp',
+                'line': i % 1000,
+            })
+        with open('test_${count}.json', 'w') as f:
+            json.dump({'issues': issues}, f)
+        "
+          
+          # Generate dashboard and measure size
+          python3 generate/generate-simple-dashboard.py test_${count}.json test_${count}.html
+          SIZE=$(ls -lh test_${count}.html | awk '{print $5}')
+          echo "| $count issues | $SIZE |" >> $GITHUB_STEP_SUMMARY
+        done
+    
+    - name: Compare with previous runs
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: benchmark-action/github-action-benchmark@v1
+      with:
+        tool: 'customSmallerIsBetter'
+        output-file-path: benchmark-results.json
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        auto-push: true
+        alert-threshold: '150%'
+        comment-on-alert: true
+        fail-on-alert: false
+
+  stress-testing:
+    name: Stress Testing
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Large repository stress test
+      run: |
+        echo "### 🏋️ Stress Test Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Create a very large test case
+        mkdir -p stress-test
+        
+        # Generate 1000 files with issues
+        python3 -c "
+        import os
+        for i in range(1000):
+            with open(f'stress-test/file_{i}.cpp', 'w') as f:
+                f.write(f'''
+        #include <iostream>
+        class StressTest{i} {{
+            int* data;
+            char buffer[10];
+        public:
+            StressTest{i}() : data(new int[100]) {{}}
+            ~StressTest{i}() {{ delete data; }} // Memory leak: should be delete[]
+            void unsafeMethod() {{
+                sprintf(buffer, \\"This is a very long string that will cause buffer overflow\\");
+                int x = 1 / 0; // Division by zero
+            }}
+        }};
+        ''')
+        "
+        
+        # Run analysis with timeout
+        timeout 300 bash -c "
+          time cppcheck --enable=all --xml --xml-version=2 stress-test/ 2> stress.xml
+        " || echo "Analysis timed out after 5 minutes"
+        
+        if [ -f stress.xml ]; then
+          FILE_COUNT=$(find stress-test -name "*.cpp" | wc -l)
+          ISSUE_COUNT=$(grep -c "<error" stress.xml || echo "0")
+          SIZE=$(ls -lh stress.xml | awk '{print $5}')
+          
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Files Analyzed | $FILE_COUNT |" >> $GITHUB_STEP_SUMMARY
+          echo "| Issues Found | $ISSUE_COUNT |" >> $GITHUB_STEP_SUMMARY
+          echo "| XML Size | $SIZE |" >> $GITHUB_STEP_SUMMARY
+        fi
+
+  performance-regression:
+    name: Performance Regression Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: Checkout PR
+      uses: actions/checkout@v4
+    
+    - name: Checkout base
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.base.sha }}
+        path: base
+    
+    - name: Compare performance
+      run: |
+        echo "### 📊 Performance Comparison" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Comparing PR against base branch..." >> $GITHUB_STEP_SUMMARY
+        
+        # Setup test
+        cat > perf-test.cpp << 'EOF'
+        #include <vector>
+        void test() {
+          std::vector<int> v;
+          for(int i = 0; i < 1000; i++) {
+            v.push_back(i);
+            if (v[i] > 500) { int* p = nullptr; *p = 1; }
+          }
+        }
+        EOF
+        
+        # Test current branch
+        START=$(date +%s.%N)
+        python3 generate/generate-simple-dashboard.py data/analysis-with-context.json current.html
+        CURRENT_TIME=$(echo "$(date +%s.%N) - $START" | bc)
+        
+        # Test base branch
+        START=$(date +%s.%N)
+        python3 base/generate/generate-simple-dashboard.py data/analysis-with-context.json base.html
+        BASE_TIME=$(echo "$(date +%s.%N) - $START" | bc)
+        
+        # Calculate difference
+        DIFF=$(echo "scale=2; (($CURRENT_TIME - $BASE_TIME) / $BASE_TIME) * 100" | bc)
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Version | Time | Size |" >> $GITHUB_STEP_SUMMARY
+        echo "|---------|------|------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Base | ${BASE_TIME}s | $(ls -lh base.html | awk '{print $5}') |" >> $GITHUB_STEP_SUMMARY
+        echo "| PR | ${CURRENT_TIME}s | $(ls -lh current.html | awk '{print $5}') |" >> $GITHUB_STEP_SUMMARY
+        echo "| Change | ${DIFF}% | - |" >> $GITHUB_STEP_SUMMARY
+        
+        # Fail if regression > 20%
+        if (( $(echo "$DIFF > 20" | bc -l) )); then
+          echo "❌ Performance regression detected: ${DIFF}% slower" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        elif (( $(echo "$DIFF < -10" | bc -l) )); then
+          echo "🚀 Performance improvement: ${DIFF#-}% faster!" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "✅ Performance is acceptable" >> $GITHUB_STEP_SUMMARY
+        fi

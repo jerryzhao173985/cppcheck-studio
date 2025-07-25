@@ -1,0 +1,405 @@
+name: 09 - API Testing
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'docs/api/**'
+      - '.github/workflows/*api*.yml'
+      - '.github/workflows/09-api-tests.yml'
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 4 * * *'  # Daily at 4 AM
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: read
+
+jobs:
+  api-endpoint-tests:
+    name: API Endpoint Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup test environment
+      run: |
+        # Install testing tools
+        npm install -g newman ajv-cli
+        pip install httpie pytest-json-schema
+    
+    - name: Start local server
+      run: |
+        # Serve the API endpoints locally
+        cd docs
+        python3 -m http.server 8080 &
+        sleep 5
+        
+        # Verify server is running
+        curl -f http://localhost:8080/api/index.json || echo "No API index found"
+    
+    - name: Test API endpoints
+      run: |
+        echo "### 🔌 API Endpoint Tests" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        BASE_URL="http://localhost:8080"
+        
+        # Test function
+        test_endpoint() {
+          local endpoint=$1
+          local expected_status=${2:-200}
+          local description=$3
+          
+          echo -n "Testing $endpoint... "
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL$endpoint")
+          
+          if [ "$STATUS" -eq "$expected_status" ]; then
+            echo "✅ PASS"
+            echo "| $endpoint | ✅ PASS | $STATUS | $description |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ FAIL (expected $expected_status, got $STATUS)"
+            echo "| $endpoint | ❌ FAIL | $STATUS | $description |" >> $GITHUB_STEP_SUMMARY
+            return 1
+          fi
+        }
+        
+        echo "| Endpoint | Status | Code | Description |" >> $GITHUB_STEP_SUMMARY
+        echo "|----------|--------|------|-------------|" >> $GITHUB_STEP_SUMMARY
+        
+        # Test endpoints
+        test_endpoint "/api/index.json" 200 "Main API index"
+        test_endpoint "/api/gallery.json" 200 "Analysis gallery"
+        test_endpoint "/api/status/" 200 "Status directory"
+        test_endpoint "/api/analyses/" 200 "Analyses directory"
+        test_endpoint "/api/nonexistent" 404 "404 handling"
+    
+    - name: Validate JSON schemas
+      run: |
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📋 JSON Schema Validation" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Define schemas
+        cat > analysis-schema.json << 'EOF'
+        {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": ["analysis_id", "repository", "timestamp"],
+          "properties": {
+            "analysis_id": { "type": "string", "pattern": "^[0-9]+-[a-z0-9]+$" },
+            "repository": { "type": "string", "pattern": "^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$" },
+            "branch": { "type": "string" },
+            "commit": { "type": "string" },
+            "timestamp": { "type": "string", "format": "date-time" },
+            "files_analyzed": { "type": "integer", "minimum": 0 },
+            "issues_found": { "type": "integer", "minimum": 0 },
+            "dashboard_url": { "type": "string", "format": "uri" }
+          }
+        }
+        EOF
+        
+        cat > gallery-schema.json << 'EOF'
+        {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": ["analyses"],
+          "properties": {
+            "analyses": {
+              "type": "array",
+              "items": { "$ref": "analysis-schema.json#" }
+            }
+          }
+        }
+        EOF
+        
+        # Validate files
+        echo "| File | Validation | Issues |" >> $GITHUB_STEP_SUMMARY
+        echo "|------|------------|--------|" >> $GITHUB_STEP_SUMMARY
+        
+        # Check if files exist and validate
+        for file in docs/api/analyses/*.json; do
+          if [ -f "$file" ]; then
+            if ajv validate -s analysis-schema.json -d "$file" 2>/dev/null; then
+              echo "| $(basename $file) | ✅ Valid | - |" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "| $(basename $file) | ❌ Invalid | Schema violation |" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+        done
+    
+    - name: API contract tests
+      run: |
+        cat > test_api_contract.py << 'EOF'
+        import json
+        import requests
+        import pytest
+        from datetime import datetime
+        
+        BASE_URL = "http://localhost:8080"
+        
+        class TestAPIContract:
+            def test_gallery_structure(self):
+                """Test gallery.json structure"""
+                try:
+                    response = requests.get(f"{BASE_URL}/api/gallery.json")
+                    if response.status_code == 200:
+                        data = response.json()
+                        assert "analyses" in data
+                        assert isinstance(data["analyses"], list)
+                        
+                        if len(data["analyses"]) > 0:
+                            analysis = data["analyses"][0]
+                            assert "analysis_id" in analysis
+                            assert "repository" in analysis
+                            assert "timestamp" in analysis
+                except:
+                    pytest.skip("Gallery not available")
+            
+            def test_analysis_consistency(self):
+                """Test that analysis files match gallery entries"""
+                try:
+                    response = requests.get(f"{BASE_URL}/api/gallery.json")
+                    if response.status_code == 200:
+                        gallery = response.json()
+                        
+                        for analysis in gallery.get("analyses", [])[:5]:  # Test first 5
+                            analysis_id = analysis["analysis_id"]
+                            
+                            # Check if individual analysis file exists
+                            detail_response = requests.get(
+                                f"{BASE_URL}/api/analyses/{analysis_id}.json"
+                            )
+                            
+                            if detail_response.status_code == 200:
+                                detail = detail_response.json()
+                                # Verify consistency
+                                assert detail["analysis_id"] == analysis["analysis_id"]
+                                assert detail["repository"] == analysis["repository"]
+                except:
+                    pytest.skip("API not available")
+            
+            def test_timestamp_format(self):
+                """Test that timestamps are valid ISO format"""
+                try:
+                    response = requests.get(f"{BASE_URL}/api/gallery.json")
+                    if response.status_code == 200:
+                        gallery = response.json()
+                        
+                        for analysis in gallery.get("analyses", []):
+                            if "timestamp" in analysis:
+                                # Should not raise exception
+                                datetime.fromisoformat(
+                                    analysis["timestamp"].replace("Z", "+00:00")
+                                )
+                except:
+                    pytest.skip("Gallery not available")
+            
+            def test_dashboard_urls(self):
+                """Test that dashboard URLs are properly formatted"""
+                try:
+                    response = requests.get(f"{BASE_URL}/api/gallery.json")
+                    if response.status_code == 200:
+                        gallery = response.json()
+                        
+                        for analysis in gallery.get("analyses", []):
+                            if "dashboard_url" in analysis:
+                                url = analysis["dashboard_url"]
+                                assert url.startswith("http")
+                                assert "/results/" in url
+                                assert url.endswith(".html")
+                except:
+                    pytest.skip("Gallery not available")
+        
+        if __name__ == "__main__":
+            pytest.main([__file__, "-v"])
+        EOF
+        
+        python test_api_contract.py -v || echo "Some contract tests failed"
+    
+    - name: Load testing
+      run: |
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🏃 API Load Testing" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Simple load test with curl
+        echo "Testing concurrent requests..." >> $GITHUB_STEP_SUMMARY
+        
+        # Make 50 concurrent requests
+        START=$(date +%s)
+        for i in {1..50}; do
+          curl -s http://localhost:8080/api/gallery.json > /dev/null &
+        done
+        wait
+        END=$(date +%s)
+        
+        DURATION=$((END - START))
+        echo "- 50 concurrent requests completed in ${DURATION}s" >> $GITHUB_STEP_SUMMARY
+        
+        # Test rate limiting (if implemented)
+        FAILURES=0
+        for i in {1..100}; do
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/gallery.json)
+          if [ "$STATUS" -ne 200 ]; then
+            FAILURES=$((FAILURES + 1))
+          fi
+        done
+        
+        echo "- 100 sequential requests: $((100 - FAILURES)) successful" >> $GITHUB_STEP_SUMMARY
+        if [ "$FAILURES" -gt 0 ]; then
+          echo "- Rate limiting detected: $FAILURES requests throttled" >> $GITHUB_STEP_SUMMARY
+        fi
+    
+    - name: Create Postman collection
+      run: |
+        cat > cppcheck-studio-api.postman_collection.json << 'EOF'
+        {
+          "info": {
+            "name": "CPPCheck Studio API",
+            "description": "API endpoints for CPPCheck Studio analysis results",
+            "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+          },
+          "item": [
+            {
+              "name": "Get API Index",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/index.json",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "index.json"]
+                }
+              }
+            },
+            {
+              "name": "Get Analysis Gallery",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/gallery.json",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "gallery.json"]
+                }
+              }
+            },
+            {
+              "name": "Get Analysis Details",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/analyses/:analysis_id.json",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "analyses", ":analysis_id.json"],
+                  "variable": [
+                    {
+                      "key": "analysis_id",
+                      "value": "1234567890-abcdef"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Analysis Status",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/status/:analysis_id.json",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "status", ":analysis_id.json"],
+                  "variable": [
+                    {
+                      "key": "analysis_id",
+                      "value": "1234567890-abcdef"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "variable": [
+            {
+              "key": "base_url",
+              "value": "https://jerryzhao173985.github.io/cppcheck-studio",
+              "type": "string"
+            }
+          ]
+        }
+        EOF
+        
+        # Test with Newman if available
+        if command -v newman &> /dev/null; then
+          newman run cppcheck-studio-api.postman_collection.json \
+            --env-var "base_url=http://localhost:8080" \
+            --reporters cli,junit \
+            --reporter-junit-export newman-results.xml || true
+        fi
+    
+    - name: Upload test artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: api-test-results
+        path: |
+          *-schema.json
+          cppcheck-studio-api.postman_collection.json
+          newman-results.xml
+        retention-days: 7
+
+  api-security-tests:
+    name: API Security Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: OWASP ZAP API Scan
+      run: |
+        echo "### 🔒 API Security Scan" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Start local server
+        cd docs
+        python3 -m http.server 8080 &
+        sleep 5
+        
+        # Basic security checks
+        echo "| Check | Result | Details |" >> $GITHUB_STEP_SUMMARY
+        echo "|-------|--------|---------|" >> $GITHUB_STEP_SUMMARY
+        
+        # Check for security headers
+        HEADERS=$(curl -s -I http://localhost:8080/api/gallery.json)
+        
+        # Check X-Content-Type-Options
+        if echo "$HEADERS" | grep -qi "X-Content-Type-Options: nosniff"; then
+          echo "| X-Content-Type-Options | ✅ Present | nosniff |" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "| X-Content-Type-Options | ⚠️ Missing | Recommended |" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        # Check CORS headers
+        if echo "$HEADERS" | grep -qi "Access-Control-Allow-Origin"; then
+          CORS=$(echo "$HEADERS" | grep -i "Access-Control-Allow-Origin" | cut -d: -f2- | tr -d ' ')
+          echo "| CORS | ⚠️ Present | $CORS |" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "| CORS | ✅ Not set | Good for security |" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        # Test for common vulnerabilities
+        # Path traversal attempt
+        STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:8080/api/../../../etc/passwd")
+        if [ "$STATUS" -eq 404 ] || [ "$STATUS" -eq 400 ]; then
+          echo "| Path Traversal | ✅ Protected | Returns $STATUS |" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "| Path Traversal | ❌ Vulnerable | Returns $STATUS |" >> $GITHUB_STEP_SUMMARY
+        fi

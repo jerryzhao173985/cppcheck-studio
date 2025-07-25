@@ -1,0 +1,213 @@
+name: 06 - Monitoring & Metrics
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # Every 6 hours
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["*"]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  collect-metrics:
+    name: Collect Workflow Metrics
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Collect workflow metrics
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        echo "### 📊 Workflow Metrics Report" >> $GITHUB_STEP_SUMMARY
+        echo "*Generated at: $(date -u)*" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Get workflow runs from last 7 days
+        SEVEN_DAYS_AGO=$(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%SZ)
+        
+        # Fetch workflow runs
+        gh api \
+          -H "Accept: application/vnd.github+json" \
+          "/repos/${{ github.repository }}/actions/runs?created=>$SEVEN_DAYS_AGO&per_page=100" \
+          > runs.json
+        
+        # Calculate metrics
+        TOTAL_RUNS=$(jq '.total_count' runs.json)
+        SUCCESSFUL_RUNS=$(jq '[.workflow_runs[] | select(.conclusion == "success")] | length' runs.json)
+        FAILED_RUNS=$(jq '[.workflow_runs[] | select(.conclusion == "failure")] | length' runs.json)
+        CANCELLED_RUNS=$(jq '[.workflow_runs[] | select(.conclusion == "cancelled")] | length' runs.json)
+        
+        # Success rate
+        if [ "$TOTAL_RUNS" -gt 0 ]; then
+          SUCCESS_RATE=$(awk "BEGIN {printf \"%.1f\", ($SUCCESSFUL_RUNS/$TOTAL_RUNS)*100}")
+        else
+          SUCCESS_RATE="0"
+        fi
+        
+        echo "## 📈 Last 7 Days Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+        echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Total Runs | $TOTAL_RUNS |" >> $GITHUB_STEP_SUMMARY
+        echo "| Successful | $SUCCESSFUL_RUNS ✅ |" >> $GITHUB_STEP_SUMMARY
+        echo "| Failed | $FAILED_RUNS ❌ |" >> $GITHUB_STEP_SUMMARY
+        echo "| Cancelled | $CANCELLED_RUNS ⚠️ |" >> $GITHUB_STEP_SUMMARY
+        echo "| Success Rate | ${SUCCESS_RATE}% |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Per-workflow breakdown
+        echo "## 🔍 Per-Workflow Breakdown" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Workflow | Runs | Success Rate | Avg Duration |" >> $GITHUB_STEP_SUMMARY
+        echo "|----------|------|--------------|--------------|" >> $GITHUB_STEP_SUMMARY
+        
+        jq -r '.workflow_runs[] | "\(.workflow_id)|\(.name)|\(.conclusion)|\(.run_started_at)|\(.updated_at)"' runs.json | \
+        while IFS='|' read -r workflow_id name conclusion started updated; do
+          if [ -n "$name" ]; then
+            echo "$workflow_id|$name|$conclusion|$started|$updated"
+          fi
+        done | sort | uniq | while IFS='|' read -r workflow_id name _; do
+          WORKFLOW_RUNS=$(jq "[.workflow_runs[] | select(.workflow_id == $workflow_id)]" runs.json)
+          WORKFLOW_COUNT=$(echo "$WORKFLOW_RUNS" | jq 'length')
+          WORKFLOW_SUCCESS=$(echo "$WORKFLOW_RUNS" | jq '[.[] | select(.conclusion == "success")] | length')
+          
+          if [ "$WORKFLOW_COUNT" -gt 0 ]; then
+            WORKFLOW_SUCCESS_RATE=$(awk "BEGIN {printf \"%.1f\", ($WORKFLOW_SUCCESS/$WORKFLOW_COUNT)*100}")
+            
+            # Calculate average duration
+            AVG_DURATION=$(echo "$WORKFLOW_RUNS" | jq -r '
+              [.[] | select(.conclusion == "success") | 
+              ((.updated_at | fromdateiso8601) - (.run_started_at | fromdateiso8601))] |
+              if length > 0 then (add / length) else 0 end' | \
+              awk '{printf "%d:%02d", int($1/60), int($1%60)}')
+            
+            echo "| $name | $WORKFLOW_COUNT | ${WORKFLOW_SUCCESS_RATE}% | ${AVG_DURATION} |" >> $GITHUB_STEP_SUMMARY
+          fi
+        done | sort -t'|' -k3 -nr | head -10
+        
+        # Resource usage
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## 💰 Resource Usage" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Calculate total minutes used
+        TOTAL_MINUTES=$(jq '[.workflow_runs[] | select(.status == "completed") | .run_duration_ms // 0] | add / 60000' runs.json)
+        TOTAL_MINUTES=${TOTAL_MINUTES%.*}
+        
+        echo "- **Total Minutes Used**: ${TOTAL_MINUTES} minutes" >> $GITHUB_STEP_SUMMARY
+        echo "- **Average per Run**: $(awk "BEGIN {if ($TOTAL_RUNS > 0) printf \"%.1f\", $TOTAL_MINUTES/$TOTAL_RUNS; else print \"0\";}") minutes" >> $GITHUB_STEP_SUMMARY
+        
+        # Most expensive workflows
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🏃 Longest Running Workflows" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Workflow | Duration | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|----------|----------|--------|" >> $GITHUB_STEP_SUMMARY
+        
+        jq -r '.workflow_runs[] | select(.status == "completed") | 
+          "\(.name)|\(.run_duration_ms // 0)|\(.conclusion)"' runs.json | \
+        sort -t'|' -k2 -nr | head -5 | \
+        while IFS='|' read -r name duration_ms conclusion; do
+          duration_min=$((duration_ms / 60000))
+          duration_sec=$(((duration_ms % 60000) / 1000))
+          status_icon=$([ "$conclusion" = "success" ] && echo "✅" || echo "❌")
+          echo "| $name | ${duration_min}m ${duration_sec}s | $status_icon |" >> $GITHUB_STEP_SUMMARY
+        done
+
+  check-health:
+    name: Health Checks
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Check workflow health
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        echo "### 🏥 Health Check Report" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Check for stuck workflows
+        echo "## 🔄 Checking for Stuck Workflows" >> $GITHUB_STEP_SUMMARY
+        
+        ONE_HOUR_AGO=$(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ)
+        STUCK_RUNS=$(gh api \
+          -H "Accept: application/vnd.github+json" \
+          "/repos/${{ github.repository }}/actions/runs?status=in_progress&created=<$ONE_HOUR_AGO" \
+          --jq '.workflow_runs | length')
+        
+        if [ "$STUCK_RUNS" -gt 0 ]; then
+          echo "⚠️ Found $STUCK_RUNS workflows running for over 1 hour" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "✅ No stuck workflows detected" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        # Check for repeated failures
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## 🔴 Repeated Failures" >> $GITHUB_STEP_SUMMARY
+        
+        gh api \
+          -H "Accept: application/vnd.github+json" \
+          "/repos/${{ github.repository }}/actions/runs?status=completed&conclusion=failure&per_page=20" \
+          --jq '.workflow_runs[] | {name: .name, workflow_id: .workflow_id}' | \
+        jq -s 'group_by(.workflow_id) | map({name: .[0].name, count: length}) | sort_by(.count) | reverse | .[:5]' | \
+        jq -r '.[] | "- \(.name): \(.count) recent failures"' >> $GITHUB_STEP_SUMMARY || echo "✅ No repeated failures detected" >> $GITHUB_STEP_SUMMARY
+        
+        # Check API rate limits
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## 📊 API Rate Limits" >> $GITHUB_STEP_SUMMARY
+        
+        RATE_LIMIT=$(gh api rate_limit)
+        CORE_REMAINING=$(echo "$RATE_LIMIT" | jq '.rate.remaining')
+        CORE_LIMIT=$(echo "$RATE_LIMIT" | jq '.rate.limit')
+        CORE_RESET=$(echo "$RATE_LIMIT" | jq '.rate.reset')
+        CORE_RESET_TIME=$(date -d "@$CORE_RESET" +"%Y-%m-%d %H:%M:%S UTC")
+        
+        echo "- Core API: $CORE_REMAINING/$CORE_LIMIT remaining" >> $GITHUB_STEP_SUMMARY
+        echo "- Resets at: $CORE_RESET_TIME" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "$CORE_REMAINING" -lt 100 ]; then
+          echo "⚠️ **Warning**: API rate limit is low!" >> $GITHUB_STEP_SUMMARY
+        fi
+
+  alert-on-failure:
+    name: Alert on Workflow Failure
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'failure'
+    
+    steps:
+    - name: Create failure alert
+      run: |
+        echo "### 🚨 Workflow Failed!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Workflow**: ${{ github.event.workflow_run.name }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Run ID**: ${{ github.event.workflow_run.id }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Actor**: ${{ github.event.workflow_run.actor.login }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Branch**: ${{ github.event.workflow_run.head_branch }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "[View Failed Run](${{ github.event.workflow_run.html_url }})" >> $GITHUB_STEP_SUMMARY
+        
+        # Check if this is a repeated failure
+        WORKFLOW_NAME="${{ github.event.workflow_run.name }}"
+        RECENT_FAILURES=$(gh api \
+          -H "Accept: application/vnd.github+json" \
+          "/repos/${{ github.repository }}/actions/runs?workflow_id=${{ github.event.workflow_run.workflow_id }}&status=completed&conclusion=failure&per_page=5" \
+          --jq '.total_count')
+        
+        if [ "$RECENT_FAILURES" -ge 3 ]; then
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "⚠️ **This workflow has failed $RECENT_FAILURES times recently!**" >> $GITHUB_STEP_SUMMARY
+        fi
+      env:
+        GH_TOKEN: ${{ github.token }}

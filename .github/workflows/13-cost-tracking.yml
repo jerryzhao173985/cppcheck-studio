@@ -1,0 +1,276 @@
+name: 13 - Cost Tracking & Optimization
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sunday at midnight
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["*"]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+jobs:
+  track-usage:
+    name: Track Actions Usage
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Analyze Actions usage
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        echo "### 💰 GitHub Actions Cost Analysis" >> $GITHUB_STEP_SUMMARY
+        echo "*Report generated: $(date -u)*" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Get billing information (requires admin access)
+        # For now, we'll estimate based on workflow runs
+        
+        # Get workflow runs from last 30 days
+        THIRTY_DAYS_AGO=$(date -u -d '30 days ago' +%Y-%m-%dT%H:%M:%SZ)
+        
+        gh api \
+          -H "Accept: application/vnd.github+json" \
+          "/repos/${{ github.repository }}/actions/runs?created=>$THIRTY_DAYS_AGO&per_page=100" \
+          > runs.json
+        
+        # Calculate total minutes by OS
+        echo "## 📊 Monthly Usage (Last 30 Days)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Parse runs and calculate minutes
+        python3 -c "
+        import json
+        import sys
+        from datetime import datetime
+        
+        with open('runs.json', 'r') as f:
+            data = json.load(f)
+        
+        # GitHub Actions multipliers
+        multipliers = {
+            'ubuntu-latest': 1,
+            'windows-latest': 2,
+            'macos-latest': 10
+        }
+        
+        os_minutes = {'Linux': 0, 'Windows': 0, 'macOS': 0}
+        workflow_minutes = {}
+        total_runs = 0
+        successful_runs = 0
+        
+        for run in data.get('workflow_runs', []):
+            if run['status'] == 'completed':
+                total_runs += 1
+                if run['conclusion'] == 'success':
+                    successful_runs += 1
+                
+                # Calculate duration
+                start = datetime.fromisoformat(run['run_started_at'].replace('Z', '+00:00'))
+                end = datetime.fromisoformat(run['updated_at'].replace('Z', '+00:00'))
+                duration = (end - start).total_seconds() / 60
+                
+                # Estimate OS (this is approximate)
+                workflow_name = run['name']
+                if workflow_name not in workflow_minutes:
+                    workflow_minutes[workflow_name] = 0
+                workflow_minutes[workflow_name] += duration
+                
+                # Rough OS estimation
+                if 'multi-platform' in workflow_name.lower():
+                    os_minutes['Linux'] += duration * 0.33
+                    os_minutes['Windows'] += duration * 0.33
+                    os_minutes['macOS'] += duration * 0.34
+                else:
+                    os_minutes['Linux'] += duration
+        
+        # Calculate costs (GitHub Free tier: 2000 minutes/month)
+        linux_minutes = os_minutes['Linux']
+        windows_minutes = os_minutes['Windows'] * 2
+        macos_minutes = os_minutes['macOS'] * 10
+        total_minutes = linux_minutes + windows_minutes + macos_minutes
+        
+        print('| OS | Raw Minutes | Billable Minutes | Cost Factor |')
+        print('|----|-------------|------------------|-------------|')
+        print(f'| Linux | {os_minutes[\"Linux\"]:.0f} | {linux_minutes:.0f} | 1x |')
+        print(f'| Windows | {os_minutes[\"Windows\"]:.0f} | {windows_minutes:.0f} | 2x |')
+        print(f'| macOS | {os_minutes[\"macOS\"]:.0f} | {macos_minutes:.0f} | 10x |')
+        print(f'| **Total** | **{sum(os_minutes.values()):.0f}** | **{total_minutes:.0f}** | - |')
+        print()
+        print(f'**Free Tier Usage**: {total_minutes:.0f} / 2000 minutes ({(total_minutes/2000)*100:.1f}%)')
+        print()
+        print('## 📈 Workflow Breakdown')
+        print()
+        print('| Workflow | Minutes | % of Total |')
+        print('|----------|---------|------------|')
+        for wf, mins in sorted(workflow_minutes.items(), key=lambda x: x[1], reverse=True)[:10]:
+            pct = (mins / sum(workflow_minutes.values())) * 100
+            print(f'| {wf} | {mins:.0f} | {pct:.1f}% |')
+        print()
+        print(f'**Success Rate**: {(successful_runs/total_runs)*100:.1f}% ({successful_runs}/{total_runs} runs)')
+        " >> $GITHUB_STEP_SUMMARY
+    
+    - name: Identify cost optimization opportunities
+      run: |
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## 💡 Cost Optimization Recommendations" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Analyze inefficiencies
+        gh api \
+          -H "Accept: application/vnd.github+json" \
+          "/repos/${{ github.repository }}/actions/runs?status=cancelled&created=>$(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%SZ)" \
+          --jq '.total_count' > cancelled_count.txt
+        
+        CANCELLED=$(cat cancelled_count.txt)
+        
+        if [ "$CANCELLED" -gt 5 ]; then
+          echo "### ⚠️ High Cancellation Rate" >> $GITHUB_STEP_SUMMARY
+          echo "- Found $CANCELLED cancelled workflows in the last 7 days" >> $GITHUB_STEP_SUMMARY
+          echo "- Consider improving concurrency controls" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        # Check for long-running workflows
+        echo "### ⏱️ Long-Running Workflows" >> $GITHUB_STEP_SUMMARY
+        
+        gh api \
+          -H "Accept: application/vnd.github+json" \
+          "/repos/${{ github.repository }}/actions/runs?per_page=50" \
+          --jq '.workflow_runs[] | select(.status == "completed") | {name: .name, duration: ((.updated_at | fromdateiso8601) - (.run_started_at | fromdateiso8601) | . / 60)}' | \
+        jq -s 'sort_by(.duration) | reverse | .[:5][] | "- \(.name): \(.duration | floor) minutes"' >> $GITHUB_STEP_SUMMARY || echo "No data available" >> $GITHUB_STEP_SUMMARY
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 💰 Cost Reduction Strategies" >> $GITHUB_STEP_SUMMARY
+        echo "1. **Use Linux runners** when possible (1x cost vs 2x Windows, 10x macOS)" >> $GITHUB_STEP_SUMMARY
+        echo "2. **Enable caching** to reduce build times" >> $GITHUB_STEP_SUMMARY
+        echo "3. **Use matrix strategy** to parallelize tests" >> $GITHUB_STEP_SUMMARY
+        echo "4. **Set timeouts** to prevent runaway jobs" >> $GITHUB_STEP_SUMMARY
+        echo "5. **Use path filters** to skip unchanged components" >> $GITHUB_STEP_SUMMARY
+        echo "6. **Consider self-hosted runners** for heavy workloads" >> $GITHUB_STEP_SUMMARY
+    
+    - name: Create cost report issue
+      if: github.event_name == 'schedule'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const title = `[Actions Cost Report] Week of ${new Date().toISOString().split('T')[0]}`;
+          const body = `## 💰 Weekly GitHub Actions Cost Report
+          
+          This is an automated report of GitHub Actions usage and costs.
+          
+          ### Summary
+          - Check the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for detailed metrics
+          - Review the recommendations for cost optimization
+          
+          ### Action Items
+          - [ ] Review long-running workflows
+          - [ ] Check for cancelled/failed runs
+          - [ ] Evaluate moving heavy jobs to Linux runners
+          - [ ] Consider implementing suggested optimizations
+          
+          ---
+          *This issue was automatically created by the cost tracking workflow.*`;
+          
+          // Check if issue already exists
+          const issues = await github.rest.issues.listForRepo({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            labels: 'cost-tracking',
+            state: 'open'
+          });
+          
+          if (issues.data.length === 0) {
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+              labels: ['cost-tracking', 'automated']
+            });
+          }
+
+  optimize-caching:
+    name: Optimize Cache Usage
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+    - name: Analyze cache efficiency
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        echo "### 🗄️ Cache Optimization Report" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Get cache usage
+        gh api \
+          -H "Accept: application/vnd.github+json" \
+          "/repos/${{ github.repository }}/actions/cache/usage" \
+          > cache_usage.json || echo '{"active_caches_size_in_bytes":0,"active_caches_count":0}' > cache_usage.json
+        
+        CACHE_SIZE=$(jq '.active_caches_size_in_bytes' cache_usage.json)
+        CACHE_COUNT=$(jq '.active_caches_count' cache_usage.json)
+        CACHE_SIZE_GB=$(echo "scale=2; $CACHE_SIZE / 1024 / 1024 / 1024" | bc)
+        
+        echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+        echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Active Caches | $CACHE_COUNT |" >> $GITHUB_STEP_SUMMARY
+        echo "| Total Size | ${CACHE_SIZE_GB} GB |" >> $GITHUB_STEP_SUMMARY
+        echo "| Repository Limit | 10 GB |" >> $GITHUB_STEP_SUMMARY
+        echo "| Usage | $(echo "scale=1; ($CACHE_SIZE_GB / 10) * 100" | bc)% |" >> $GITHUB_STEP_SUMMARY
+        
+        # List caches
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📦 Cache Details" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        gh api \
+          -H "Accept: application/vnd.github+json" \
+          "/repos/${{ github.repository }}/actions/caches?per_page=20" \
+          --jq '.actions_caches[] | "- \(.key): \(.size_in_bytes / 1024 / 1024 | floor) MB (last used: \(.last_accessed_at))"' >> $GITHUB_STEP_SUMMARY || echo "No cache data available" >> $GITHUB_STEP_SUMMARY
+
+  workflow-performance:
+    name: Workflow Performance Analysis
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success' && github.event_name == 'workflow_run'
+    
+    steps:
+    - name: Track workflow metrics
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        WORKFLOW_NAME="${{ github.event.workflow_run.name }}"
+        DURATION=$(( ($(date -d "${{ github.event.workflow_run.updated_at }}" +%s) - $(date -d "${{ github.event.workflow_run.run_started_at }}" +%s)) / 60 ))
+        
+        echo "📊 Workflow completed: $WORKFLOW_NAME" >> $GITHUB_STEP_SUMMARY
+        echo "⏱️ Duration: $DURATION minutes" >> $GITHUB_STEP_SUMMARY
+        
+        # Store metrics (in a real implementation, this would go to a metrics service)
+        echo "{\"workflow\": \"$WORKFLOW_NAME\", \"duration\": $DURATION, \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" >> workflow_metrics.json
+
+  cost-summary:
+    name: Cost Summary
+    runs-on: ubuntu-latest
+    needs: [track-usage, optimize-caching]
+    if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    
+    steps:
+    - name: Create final summary
+      run: |
+        echo "## 💰 Cost Tracking Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Component | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Usage Tracking | ${{ needs.track-usage.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Cache Optimization | ${{ needs.optimize-caching.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Next report will be generated in 7 days." >> $GITHUB_STEP_SUMMARY
