@@ -477,6 +477,7 @@ class SimpleDashboardGenerator:
             background: #f8f9fa;
             color: #2c3e50;
             line-height: 1.6;
+            font-size: 16px; /* Base font size */
         }
         
         .container {
@@ -503,7 +504,7 @@ class SimpleDashboardGenerator:
         .header-info {
             display: flex;
             gap: 30px;
-            font-size: 0.95em;
+            font-size: 0.85em; /* Consistent with table font size */
             opacity: 0.9;
         }
         
@@ -550,7 +551,7 @@ class SimpleDashboardGenerator:
         }
         
         .stat-card .value {
-            font-size: 2.5em;
+            font-size: 2em; /* Reduced from 2.5em for consistency */
             font-weight: 700;
             margin-bottom: 5px;
         }
@@ -593,7 +594,7 @@ class SimpleDashboardGenerator:
             padding: 12px 15px 12px 45px;
             border: 1px solid #ddd;
             border-radius: 8px;
-            font-size: 14px;
+            font-size: 0.875em; /* 14px / 16px */
             transition: border-color 0.2s;
         }
         
@@ -615,7 +616,7 @@ class SimpleDashboardGenerator:
             border-radius: 8px;
             cursor: pointer;
             transition: all 0.2s;
-            font-size: 14px;
+            font-size: 0.875em; /* 14px / 16px */
             font-weight: 500;
         }
         
@@ -642,7 +643,7 @@ class SimpleDashboardGenerator:
             padding: 10px 0;
             margin-bottom: 10px;
             color: #7f8c8d;
-            font-size: 14px;
+            font-size: 0.875em; /* 14px / 16px */
         }
         
         /* Table */
@@ -685,7 +686,7 @@ class SimpleDashboardGenerator:
         
         .issue-row td {
             padding: 15px;
-            font-size: 14px;
+            font-size: 0.875em; /* 14px / 16px */
         }
         
         .indicator-cell {
@@ -720,7 +721,7 @@ class SimpleDashboardGenerator:
         .severity-badge {
             padding: 4px 12px;
             border-radius: 20px;
-            font-size: 12px;
+            font-size: 0.75em; /* 12px / 16px */
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -753,7 +754,7 @@ class SimpleDashboardGenerator:
         
         .id-cell {
             font-family: 'Monaco', 'Consolas', monospace;
-            font-size: 12px;
+            font-size: 0.75em; /* 12px / 16px */
             color: #7f8c8d;
         }
         
@@ -764,7 +765,7 @@ class SimpleDashboardGenerator:
             padding: 8px 16px;
             border-radius: 6px;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 0.75em; /* 12px / 16px */
             transition: background-color 0.2s;
         }
         
@@ -861,7 +862,7 @@ class SimpleDashboardGenerator:
             border-radius: 8px;
             margin-bottom: 30px;
             font-family: 'Monaco', 'Consolas', monospace;
-            font-size: 14px;
+            font-size: 0.875em; /* 14px / 16px */
         }
         
         .code-preview {
@@ -871,7 +872,7 @@ class SimpleDashboardGenerator:
             border-radius: 8px;
             overflow-x: auto;
             font-family: 'Monaco', 'Consolas', monospace;
-            font-size: 13px;
+            font-size: 0.8125em; /* 13px / 16px */
             line-height: 1.5;
         }
         
@@ -881,6 +882,116 @@ class SimpleDashboardGenerator:
             margin: 0 -20px;
             padding: 0 20px;
             border-left: 3px solid #667eea;
+        }
+        
+        /* Responsive font sizes */
+        @media (max-width: 768px) {
+            /* Core font size reduction */
+            body {
+                font-size: 14px; /* Reduced from 16px for better content density */
+            }
+            
+            /* Header layout adjustments */
+            .header-content {
+                flex-direction: column; /* Vertical stacking */
+                text-align: center;
+                gap: 10px;
+            }
+            
+            .header-content h1 {
+                font-size: 1.5em;
+            }
+            
+            .header-info {
+                flex-direction: column; /* Vertical stacking */
+                gap: 5px;
+                font-size: 0.8em;
+            }
+            
+            /* Stats grid adjustments */
+            .stats-grid {
+                grid-template-columns: 1fr 1fr; /* 2 columns on mobile */
+                gap: 10px;
+            }
+            
+            .stat-card {
+                padding: 15px;
+            }
+            
+            .stat-card .value {
+                font-size: 1.5em;
+            }
+            
+            .stat-card i {
+                font-size: 1.5em;
+            }
+            
+            /* Controls layout adjustments */
+            .controls {
+                flex-direction: column; /* Vertical stacking */
+                padding: 15px;
+                gap: 15px;
+            }
+            
+            .search-container {
+                min-width: 100%;
+            }
+            
+            .search-container input {
+                font-size: 16px; /* Prevent iOS zoom */
+                min-height: 44px; /* Touch target */
+            }
+            
+            .filter-buttons {
+                width: 100%;
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+            
+            .filter-btn {
+                min-height: 44px; /* Touch target */
+                margin: 2px;
+            }
+            
+            /* Table adjustments */
+            .table-container {
+                overflow-x: auto; /* Horizontal scroll */
+                -webkit-overflow-scrolling: touch;
+            }
+            
+            .issues-table {
+                min-width: 600px;
+            }
+            
+            .issues-table th,
+            .issue-row td {
+                font-size: 0.85em;
+                padding: 10px; /* Reduced from 15px */
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            
+            .issue-row {
+                min-height: 44px; /* Touch target */
+            }
+            
+            .severity-badge {
+                font-size: 0.7em;
+                padding: 3px 6px;
+            }
+            
+            .action-btn {
+                min-width: 44px;
+                min-height: 44px;
+            }
+            
+            /* Modal adjustments */
+            .modal-content {
+                margin: 10px;
+                width: calc(100% - 20px);
+                max-height: calc(100vh - 20px);
+            }
         }
         """
 

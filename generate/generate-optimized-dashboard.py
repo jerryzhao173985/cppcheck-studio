@@ -219,6 +219,7 @@ class OptimizedDashboardGenerator:
             color: var(--text-primary);
             line-height: 1.6;
             transition: background-color 0.3s, color 0.3s;
+            font-size: 16px; /* Base font size for consistent rem calculations */
         }}
         
         /* Header */
@@ -777,27 +778,75 @@ class OptimizedDashboardGenerator:
         
         /* Responsive */
         @media (max-width: 768px) {{
+            body {{
+                font-size: 14px; /* Smaller base font on mobile */
+            }}
+            
+            .title {{
+                font-size: 1.25rem; /* Smaller title on mobile */
+            }}
+            
             .header-content {{
                 flex-direction: column;
                 align-items: stretch;
             }}
             
+            .stat-badge {{
+                font-size: 0.8rem; /* Smaller stat badges */
+                padding: 0.2rem 0.5rem;
+            }}
+            
             .controls-content {{
                 flex-direction: column;
+                gap: 0.5rem;
             }}
             
             .search-box {{
                 min-width: 100%;
+                height: 44px; /* Touch target size */
+                font-size: 16px; /* Prevent zoom on iOS */
+            }}
+            
+            .control-btn {{
+                font-size: 0.8rem;
+                padding: 10px 12px;
+                min-height: 44px; /* Touch target size */
+            }}
+            
+            /* Enable horizontal scroll for issues */
+            .issues-container {{
+                padding: 10px;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }}
+            
+            .file-section {{
+                min-width: 600px; /* Force horizontal scroll */
             }}
             
             .file-header {{
                 flex-direction: column;
                 align-items: flex-start;
                 gap: 0.5rem;
+                padding: 10px;
             }}
             
             .issue-item {{
                 flex-direction: column;
+                padding: 10px;
+                min-height: 44px; /* Touch target size */
+            }}
+            
+            .issue-message {{
+                font-size: 0.8rem;
+            }}
+            
+            .issue-code {{
+                font-size: 0.75rem;
+            }}
+            
+            .issue-meta {{
+                font-size: 0.7rem;
             }}
             
             .modal-content {{
