@@ -14,7 +14,7 @@ The generated HTML analysis reports had inconsistent font sizes where some rows 
 ## 2. Files Changed in the PR
 
 ### Python Generators (6 files)
-```
+```text
 generate/generate-optimized-dashboard.py          | 130 changes
 generate/generate-production-dashboard.py         |  45 changes
 generate/generate-simple-dashboard.py             |  58 changes
@@ -24,12 +24,12 @@ generate/generate-split-dashboard.py              |  20 changes
 ```
 
 ### TypeScript Implementation (1 file)
-```
+```text
 cppcheck-dashboard-generator/src/styles.ts        |  20 changes
 ```
 
 ### Data Files (2 files - removed test data)
-```
+```text
 dashboard_data/code_context.jsonl                 | Removed
 dashboard_data/issues.jsonl                       | Removed
 ```
