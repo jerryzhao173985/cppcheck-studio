@@ -144,7 +144,7 @@ body { font-size: 16px; }
 
 ## Commit Evolution
 
-```
+```text
 9f6b5f7 → Initial px to em conversion
   ├── 14px → 0.875em
   ├── 12px → 0.75em

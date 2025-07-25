@@ -134,7 +134,7 @@ class VirtualScrollDashboardGenerator:
         <div class="controls">
             <div class="search-container">
                 <i class="fas fa-search"></i>
-                <input type="text" id="searchInput" placeholder="Search by file, message, or ID...">
+                <input type="text" id="searchInput" placeholder="Search by file, message, ID, or line number... (Ctrl+F to focus, Esc to clear)">
             </div>
             
             <div class="filter-buttons">
