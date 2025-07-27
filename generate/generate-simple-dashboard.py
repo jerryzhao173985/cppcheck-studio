@@ -721,7 +721,7 @@ class SimpleDashboardGenerator:
         .severity-badge {
             padding: 4px 12px;
             border-radius: 20px;
-            font-size: 0.75em; /* 12px / 16px */
+            font-size: 0.875em; /* 14px / 16px */
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -754,7 +754,7 @@ class SimpleDashboardGenerator:
         
         .id-cell {
             font-family: 'Monaco', 'Consolas', monospace;
-            font-size: 0.75em; /* 12px / 16px */
+            font-size: 0.875em; /* 14px / 16px */
             color: #7f8c8d;
         }
         
@@ -765,7 +765,7 @@ class SimpleDashboardGenerator:
             padding: 8px 16px;
             border-radius: 6px;
             cursor: pointer;
-            font-size: 0.75em; /* 12px / 16px */
+            font-size: 0.875em; /* 14px / 16px */
             transition: background-color 0.2s;
         }
         
@@ -872,7 +872,7 @@ class SimpleDashboardGenerator:
             border-radius: 8px;
             overflow-x: auto;
             font-family: 'Monaco', 'Consolas', monospace;
-            font-size: 0.8125em; /* 13px / 16px */
+            font-size: 0.85em; /* 13.6px / 16px */
             line-height: 1.5;
         }
         
