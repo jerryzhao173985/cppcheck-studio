@@ -125,7 +125,7 @@ class VirtualScrollDashboardGenerator:
         <div class="controls">
             <div class="search-container">
                 <i class="fas fa-search"></i>
-                <input type="text" id="searchInput" placeholder="Search by file, message, or ID..." onkeyup="debounce(filterData, 300)()">
+                <input type="text" id="searchInput" placeholder="Search by file, message, or ID...">
             </div>
             
             <div class="filter-buttons">
@@ -238,6 +238,10 @@ class VirtualScrollDashboardGenerator:
                 
                 // Set up virtual scrolling
                 setupVirtualScroll();
+                
+                // Set up search input with debounced filtering
+                const searchInput = document.getElementById('searchInput');
+                searchInput.addEventListener('input', debouncedFilterData);
                 
                 // Initial render
                 filterData();
@@ -583,6 +587,9 @@ class VirtualScrollDashboardGenerator:
                 timeout = setTimeout(later, wait);
             }};
         }}
+        
+        // Create debounced filter function once
+        const debouncedFilterData = debounce(filterData, 300);
         
         function showLoadingStatus(text) {{
             document.getElementById('loadingStatus').style.display = 'block';

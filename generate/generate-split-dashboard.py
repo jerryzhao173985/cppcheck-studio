@@ -1242,7 +1242,6 @@ class SplitDashboardGenerator:
             }
             
             .modal-content {
-                margin: 20px;
                 width: 100%;
                 max-width: calc(100% - 40px);
                 margin: 0 auto;

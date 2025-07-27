@@ -466,6 +466,12 @@ class SimpleDashboardGenerator:
     def generate_styles(self):
         """Generate CSS styles"""
         return """
+        :root {
+            /* Font size variables for consistency */
+            --font-small: 0.85em;
+            --font-normal: 1em;
+        }
+        
         * {
             margin: 0;
             padding: 0;
@@ -477,7 +483,7 @@ class SimpleDashboardGenerator:
             background: #f8f9fa;
             color: #2c3e50;
             line-height: 1.6;
-            font-size: 16px; /* Base font size */
+            font-size: 100%; /* Respect user preferences, defaults to 16px */
         }
         
         .container {
@@ -872,7 +878,7 @@ class SimpleDashboardGenerator:
             border-radius: 8px;
             overflow-x: auto;
             font-family: 'Monaco', 'Consolas', monospace;
-            font-size: 0.85em; /* 13.6px / 16px */
+            font-size: 0.875em; /* 14px / 16px - standardized with other elements */
             line-height: 1.5;
         }
         
@@ -938,7 +944,7 @@ class SimpleDashboardGenerator:
             }
             
             .search-container input {
-                font-size: 16px; /* Prevent iOS zoom */
+                font-size: 1rem; /* Prevent iOS zoom */
                 min-height: 44px; /* Touch target */
             }
             
