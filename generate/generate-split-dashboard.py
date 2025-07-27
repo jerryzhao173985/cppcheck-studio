@@ -571,6 +571,7 @@ class SplitDashboardGenerator:
             background: #f5f7fa;
             color: #2d3748;
             line-height: 1.6;
+            font-size: 16px; /* Base font size for consistent rem/em calculations */
         }
         
         .container {
@@ -660,7 +661,7 @@ class SplitDashboardGenerator:
         }
         
         .stat-card .value {
-            font-size: 2.5em;
+            font-size: 2em; /* Reduced from 2.5em for consistency */
             font-weight: 700;
             margin-bottom: 5px;
         }
@@ -708,7 +709,7 @@ class SplitDashboardGenerator:
             padding: 10px 15px 10px 40px;
             border: 1px solid #e2e8f0;
             border-radius: 8px;
-            font-size: 0.95em;
+            font-size: 0.85em; /* Consistent with table font size */
             transition: border-color 0.2s;
         }
         
@@ -821,7 +822,7 @@ class SplitDashboardGenerator:
         
         .issues-table td {
             padding: 15px;
-            font-size: 0.95em;
+            font-size: 0.85em; /* Consistent with table font size */
         }
         
         .file-cell {
@@ -1042,7 +1043,7 @@ class SplitDashboardGenerator:
             border: 1px solid #e2e8f0;
             border-radius: 8px;
             padding: 15px;
-            font-size: 0.95em;
+            font-size: 0.85em; /* Consistent with table font size */
             line-height: 1.6;
         }
         
@@ -1088,7 +1089,7 @@ class SplitDashboardGenerator:
         }
         
         .issue-explanation h5 {
-            font-size: 0.95em;
+            font-size: 0.85em; /* Consistent with table font size */
             font-weight: 600;
             color: #2c5282;
             margin-bottom: 10px;
@@ -1140,6 +1141,119 @@ class SplitDashboardGenerator:
         .no-code-message .hint {
             font-size: 0.9em;
             margin-top: 15px;
+        }
+        
+        /* Responsive design */
+        @media (max-width: 768px) {
+            body {
+                font-size: 14px; /* Smaller base font on mobile */
+            }
+            
+            .header h1 {
+                font-size: 1.5em; /* Smaller header on mobile */
+            }
+            
+            .header-content {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .header-info {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+                padding: 10px;
+            }
+            
+            .stat-card {
+                padding: 15px;
+            }
+            
+            .stat-card .value {
+                font-size: 1.5em; /* Smaller stat values on mobile */
+            }
+            
+            .stat-card i {
+                font-size: 1.5em; /* Smaller icons on mobile */
+            }
+            
+            .controls {
+                padding: 10px;
+                margin: 0 10px;
+                gap: 10px;
+            }
+            
+            .search-container {
+                min-width: 100%;
+            }
+            
+            .search-container input {
+                height: 44px; /* Touch target size */
+                font-size: 16px; /* Prevent zoom on iOS */
+            }
+            
+            .filter-buttons {
+                justify-content: center;
+                width: 100%;
+            }
+            
+            .filter-btn {
+                font-size: 0.8em; /* Smaller filter buttons */
+                padding: 10px 12px;
+                min-height: 44px; /* Touch target size */
+            }
+            
+            /* Enable horizontal scroll for table on mobile */
+            .virtual-scroll-container {
+                margin: 0 10px 10px;
+            }
+            
+            .issues-table-wrapper {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            
+            .issues-table {
+                min-width: 600px; /* Force horizontal scroll */
+            }
+            
+            .issues-table th,
+            .issues-table td {
+                font-size: 0.85em; /* Maintain table text size */
+                padding: 10px; /* Touch-friendly padding */
+            }
+            
+            .issue-row {
+                min-height: 44px; /* Touch target size */
+            }
+            
+            .severity-badge {
+                font-size: 0.7em; /* Smaller badges on mobile */
+                padding: 3px 8px;
+            }
+            
+            .action-btn {
+                min-width: 44px;
+                min-height: 44px;
+                padding: 10px;
+            }
+            
+            .modal-content {
+                margin: 20px;
+                width: calc(100% - 40px);
+            }
+            
+            .modal-header {
+                padding: 15px;
+            }
+            
+            .close-btn {
+                width: 44px;
+                height: 44px;
+            }
         }
         """
 

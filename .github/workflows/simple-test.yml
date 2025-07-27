@@ -40,7 +40,7 @@ jobs:
         
         # Run analysis
         cppcheck --enable=all --xml --xml-version=2 test-src 2> test.xml
-        python3 xml2json-simple.py test.xml > test.json
+        python3 utils/xml2json-simple.py test.xml > test.json
         
         # Generate dashboard
         cd cppcheck-dashboard-generator

@@ -65,10 +65,10 @@ jobs:
         cd ..
         
         # Convert and generate dashboard
-        python3 xml2json-simple.py cppcheck-results.xml > analysis.json
+        python3 utils/xml2json-simple.py cppcheck-results.xml > analysis.json
         
         cd project
-        python3 ../add-code-context.py ../analysis.json ../analysis-with-context.json
+        python3 ../utils/add-code-context.py ../analysis.json ../analysis-with-context.json
         cd ..
         
         # Generate dashboard

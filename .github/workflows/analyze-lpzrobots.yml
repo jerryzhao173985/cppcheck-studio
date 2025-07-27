@@ -146,7 +146,7 @@ jobs:
         
         # Convert results
         echo "Converting results to JSON..."
-        python3 cppcheck-studio/xml2json-simple.py cppcheck-results.xml > analysis.json
+        python3 cppcheck-studio/utils/xml2json-simple.py cppcheck-results.xml > analysis.json
         
         # Check issue count and potentially limit
         ISSUE_COUNT=$(python3 -c "import json; print(len(json.load(open('analysis.json'))['issues']))")
@@ -177,7 +177,7 @@ with open('analysis-limited.json', 'w') as f:
         # Add code context
         echo "Adding code context..."
         cd lpzrobots
-        python3 ../cppcheck-studio/add-code-context.py ../analysis.json ../analysis-with-context.json
+        python3 ../cppcheck-studio/utils/add-code-context.py ../analysis.json ../analysis-with-context.json
         cd ..
         
         # Generate dashboard

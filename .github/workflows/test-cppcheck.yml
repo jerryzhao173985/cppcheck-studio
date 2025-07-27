@@ -127,7 +127,7 @@ jobs:
       run: |
         echo "Converting XML to JSON..."
         # Use simple XML parser that doesn't require lxml
-        python3 xml2json-simple.py cppcheck-results.xml > analysis.json
+        python3 utils/xml2json-simple.py cppcheck-results.xml > analysis.json
         
         echo "JSON output preview:"
         head -20 analysis.json || true
@@ -140,7 +140,7 @@ jobs:
       run: |
         echo "Adding code context..."
         cd test-cpp-project
-        python3 ../add-code-context.py ../analysis.json ../analysis-with-context.json
+        python3 ../utils/add-code-context.py ../analysis.json ../analysis-with-context.json
         cd ..
         
         # Check if context was added

@@ -162,7 +162,7 @@ jobs:
         
         # Convert to JSON
         echo "📊 Converting results to JSON..."
-        python3 cppcheck-studio/xml2json-simple.py cppcheck-results.xml > analysis.json
+        python3 cppcheck-studio/utils/xml2json-simple.py cppcheck-results.xml > analysis.json
         
         # Get issue count
         ISSUE_COUNT=$(python3 -c "import json; print(len(json.load(open('analysis.json'))['issues']))")
@@ -172,7 +172,7 @@ jobs:
         # Add code context
         echo "📝 Adding code context..."
         cd target-repo
-        python3 ../cppcheck-studio/add-code-context.py ../analysis.json ../analysis-with-context.json
+        python3 ../cppcheck-studio/utils/add-code-context.py ../analysis.json ../analysis-with-context.json
         cd ..
         
         # Verify the data
