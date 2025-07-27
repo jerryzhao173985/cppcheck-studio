@@ -209,7 +209,6 @@ class SplitDashboardGenerator:
         
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {{
-            console.log('DOM loaded, fetching data...');
             loadData();
         }});
         
@@ -220,7 +219,6 @@ class SplitDashboardGenerator:
                 // Load issues
                 const issuesResponse = await fetch('{issues_file}');
                 issuesData = await issuesResponse.json();
-                console.log('Loaded', issuesData.length, 'issues');
                 
                 showLoading('Loading code context...');
                 
@@ -232,7 +230,6 @@ class SplitDashboardGenerator:
                 for (let [index, context] of Object.entries(contextData)) {{
                     codeContextMap.set(parseInt(index), context);
                 }}
-                console.log('Loaded code context for', codeContextMap.size, 'issues');
                 
                 dataLoaded = true;
                 hideLoading();

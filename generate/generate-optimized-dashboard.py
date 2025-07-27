@@ -179,32 +179,93 @@ class OptimizedDashboardGenerator:
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Code Analysis - Optimized Dashboard</title>
     <style>
+        /*
+         * CSS Variable System Documentation
+         * =================================
+         * This dashboard uses CSS custom properties for theming and consistency.
+         * 
+         * Color Variables:
+         * - All colors are defined as both hex (--color) and RGB (--color-rgb) values
+         * - RGB values are used for alpha transparency with rgba()
+         * - Hex values are used for solid colors
+         * 
+         * Usage Examples:
+         * - Solid color: background: var(--bg-primary);
+         * - With alpha: background: rgba(var(--bg-primary-rgb), 0.9);
+         * - With fallback: color: var(--text-primary, #212529);
+         * 
+         * Theme Support:
+         * - Light theme: Default :root variables
+         * - Dark theme: [data-theme="dark"] overrides
+         * - System preference: @media (prefers-color-scheme: dark)
+         */
+        
+        /* CSS Custom Properties with RGB fallbacks for better compatibility */
         :root {{
+            /* Primary colors as hex */
             --bg-primary: #ffffff;
             --bg-secondary: #f8f9fa;
             --bg-tertiary: #e9ecef;
+            
+            /* RGB equivalents for alpha transparency */
+            --bg-primary-rgb: 255, 255, 255;
+            --bg-secondary-rgb: 248, 249, 250;
+            --bg-tertiary-rgb: 233, 236, 239;
+            
+            /* Text colors */
             --text-primary: #212529;
             --text-secondary: #6c757d;
+            --text-primary-rgb: 33, 37, 41;
+            --text-secondary-rgb: 108, 117, 125;
+            
+            /* UI colors */
             --border-color: #dee2e6;
+            --border-color-rgb: 222, 226, 230;
+            --hover-bg: var(--bg-secondary);
+            --hover-bg-rgb: var(--bg-secondary-rgb);
+            
+            /* Status colors */
             --error-color: #dc3545;
             --warning-color: #ffc107;
             --info-color: #0dcaf0;
             --success-color: #198754;
             --style-color: #6f42c1;
-            --hover-bg: #f8f9fa;
-            --shadow: 0 1px 3px rgba(0,0,0,0.12);
-            --font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', monospace;
+            
+            /* Effects */
+            --shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+            --shadow-hover: 0 2px 8px rgba(0, 0, 0, 0.15);
+            --transition-speed: 200ms;
+            
+            /* Typography */
+            --font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
         }}
         
         [data-theme="dark"] {{
+            /* Primary colors as hex */
             --bg-primary: #1a1a1a;
             --bg-secondary: #2d2d2d;
             --bg-tertiary: #3a3a3a;
+            
+            /* RGB equivalents for alpha transparency */
+            --bg-primary-rgb: 26, 26, 26;
+            --bg-secondary-rgb: 45, 45, 45;
+            --bg-tertiary-rgb: 58, 58, 58;
+            
+            /* Text colors */
             --text-primary: #e0e0e0;
             --text-secondary: #a0a0a0;
+            --text-primary-rgb: 224, 224, 224;
+            --text-secondary-rgb: 160, 160, 160;
+            
+            /* UI colors */
             --border-color: #404040;
-            --hover-bg: #2d2d2d;
-            --shadow: 0 1px 3px rgba(0,0,0,0.5);
+            --border-color-rgb: 64, 64, 64;
+            --hover-bg: var(--bg-tertiary);
+            --hover-bg-rgb: var(--bg-tertiary-rgb);
+            
+            /* Effects */
+            --shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+            --shadow-hover: 0 2px 8px rgba(0, 0, 0, 0.7);
         }}
         
         * {{
@@ -231,7 +292,7 @@ class OptimizedDashboardGenerator:
             top: 0;
             z-index: 100;
             backdrop-filter: blur(10px);
-            background: rgba(var(--bg-secondary), 0.95);
+            background: rgba(var(--bg-secondary-rgb), 0.95);
         }}
         
         .header-content {{
@@ -245,7 +306,7 @@ class OptimizedDashboardGenerator:
         }}
         
         .title {{
-            font-size: 1.5rem;
+            font-size: 1.5em;
             font-weight: 600;
             display: flex;
             align-items: center;
@@ -265,7 +326,7 @@ class OptimizedDashboardGenerator:
             gap: 0.25rem;
             padding: 0.25rem 0.75rem;
             border-radius: 1rem;
-            font-size: 0.875rem;
+            font-size: 0.85em;
             font-weight: 500;
             cursor: pointer;
             transition: transform 0.2s;
@@ -337,7 +398,7 @@ class OptimizedDashboardGenerator:
             border-radius: 0.5rem;
             background: var(--bg-primary);
             color: var(--text-primary);
-            font-size: 0.875rem;
+            font-size: 0.85em;
         }}
         
         .search-input:focus {{
@@ -351,7 +412,7 @@ class OptimizedDashboardGenerator:
             right: 0.75rem;
             top: 50%;
             transform: translateY(-50%);
-            font-size: 0.75rem;
+            font-size: 0.75em;
             color: var(--text-secondary);
         }}
         
@@ -366,7 +427,7 @@ class OptimizedDashboardGenerator:
             border-radius: 0.5rem;
             background: var(--bg-primary);
             color: var(--text-primary);
-            font-size: 0.875rem;
+            font-size: 0.85em;
             cursor: pointer;
             transition: all 0.2s;
         }}
@@ -402,7 +463,7 @@ class OptimizedDashboardGenerator:
             display: flex;
             justify-content: space-between;
             margin-bottom: 0.5rem;
-            font-size: 0.875rem;
+            font-size: 0.85em;
         }}
         
         .progress-bar {{
@@ -455,11 +516,11 @@ class OptimizedDashboardGenerator:
         .file-name {{
             font-weight: 500;
             font-family: var(--font-mono);
-            font-size: 0.875rem;
+            font-size: 0.85em;
         }}
         
         .issue-count {{
-            font-size: 0.75rem;
+            font-size: 0.75em;
             color: var(--text-secondary);
         }}
         
@@ -481,7 +542,7 @@ class OptimizedDashboardGenerator:
         .severity-dot.information {{ background: var(--info-color); }}
         
         .file-toggle {{
-            font-size: 0.75rem;
+            font-size: 0.75em;
             color: var(--text-secondary);
         }}
         
@@ -523,7 +584,7 @@ class OptimizedDashboardGenerator:
             flex-shrink: 0;
             padding: 0.125rem 0.5rem;
             border-radius: 0.25rem;
-            font-size: 0.75rem;
+            font-size: 0.75em;
             font-weight: 500;
         }}
         
@@ -533,13 +594,13 @@ class OptimizedDashboardGenerator:
         }}
         
         .issue-message {{
-            font-size: 0.875rem;
+            font-size: 0.85em;
             margin-bottom: 0.25rem;
         }}
         
         .issue-code {{
             font-family: var(--font-mono);
-            font-size: 0.8rem;
+            font-size: 0.8em;
             background: var(--bg-tertiary);
             padding: 0.25rem 0.5rem;
             border-radius: 0.25rem;
@@ -551,7 +612,7 @@ class OptimizedDashboardGenerator:
         .issue-meta {{
             display: flex;
             gap: 1rem;
-            font-size: 0.75rem;
+            font-size: 0.75em;
             color: var(--text-secondary);
         }}
         
@@ -567,7 +628,7 @@ class OptimizedDashboardGenerator:
             border-radius: 0.25rem;
             background: var(--bg-primary);
             color: var(--text-primary);
-            font-size: 0.75rem;
+            font-size: 0.75em;
             cursor: pointer;
             transition: all 0.2s;
         }}
@@ -632,14 +693,14 @@ class OptimizedDashboardGenerator:
         }}
         
         .modal-title {{
-            font-size: 1.125rem;
+            font-size: 1.125em;
             font-weight: 600;
         }}
         
         .modal-close {{
             background: none;
             border: none;
-            font-size: 1.5rem;
+            font-size: 1.5em;
             cursor: pointer;
             color: var(--text-secondary);
             padding: 0;
@@ -678,7 +739,7 @@ class OptimizedDashboardGenerator:
         
         .detail-section h4 {{
             margin: 0 0 0.75rem 0;
-            font-size: 1rem;
+            font-size: 1em;
             color: var(--text-primary);
         }}
         
@@ -687,7 +748,7 @@ class OptimizedDashboardGenerator:
             border-radius: 0.5rem;
             overflow: hidden;
             font-family: var(--font-mono);
-            font-size: 0.875rem;
+            font-size: 0.85em;
         }}
         
         .code-line {{
@@ -772,7 +833,7 @@ class OptimizedDashboardGenerator:
         }}
         
         .empty-state h2 {{
-            font-size: 1.5rem;
+            font-size: 1.5em;
             margin-bottom: 0.5rem;
         }}
         
@@ -789,6 +850,10 @@ class OptimizedDashboardGenerator:
             .header-content {{
                 flex-direction: column;
                 align-items: stretch;
+            }}
+            
+            .stats-bar {{
+                font-size: 0.85em;
             }}
             
             .stat-badge {{
@@ -831,8 +896,13 @@ class OptimizedDashboardGenerator:
                 padding: 10px;
             }}
             
+            .file-info h3 {{
+                font-size: 0.85em;
+            }}
+            
             .issue-item {{
                 flex-direction: column;
+                font-size: 0.85em;
                 padding: 10px;
                 min-height: 44px; /* Touch target size */
             }}
@@ -861,6 +931,164 @@ class OptimizedDashboardGenerator:
         .hljs-comment {{ color: #6a737d; }}
         .hljs-number {{ color: #005cc5; }}
         .hljs-function {{ color: #6f42c1; }}
+        
+        /* Print Styles for Professional Reports */
+        @media print {{
+            /* Reset for print */
+            * {{
+                background: transparent !important;
+                color: #000 !important;
+                box-shadow: none !important;
+                text-shadow: none !important;
+            }}
+            
+            body {{
+                font-size: 12pt;
+                line-height: 1.5;
+                font-family: Georgia, 'Times New Roman', serif;
+                margin: 0;
+                padding: 0;
+            }}
+            
+            /* Hide interactive elements */
+            .controls,
+            .search-container,
+            .filter-buttons,
+            button,
+            .action-btn,
+            .toggle-fix,
+            .fix-button,
+            a[href^="#"],
+            a[href^="javascript:"] {{
+                display: none !important;
+            }}
+            
+            /* Header styling */
+            .header {{
+                background: none !important;
+                border-bottom: 2px solid #000;
+                padding: 0 0 1em 0;
+                margin-bottom: 1em;
+            }}
+            
+            .title {{
+                font-size: 24pt;
+                font-weight: bold;
+                margin-bottom: 0.5em;
+                color: #000;
+            }}
+            
+            /* Stats formatting */
+            .stats-bar {{
+                display: flex;
+                justify-content: space-between;
+                margin: 1em 0;
+                page-break-inside: avoid;
+            }}
+            
+            .stat-badge {{
+                border: 1px solid #000;
+                padding: 0.5em;
+                text-align: center;
+                flex: 1;
+                margin: 0 0.25em;
+            }}
+            
+            /* Tables */
+            .issue-table {{
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 10pt;
+                page-break-inside: auto;
+            }}
+            
+            .issue-table th,
+            .issue-table td {{
+                border: 1px solid #000;
+                padding: 0.5em;
+                text-align: left;
+            }}
+            
+            .issue-table th {{
+                background-color: #f0f0f0 !important;
+                font-weight: bold;
+                position: sticky;
+                top: 0;
+            }}
+            
+            .issue-table tr {{
+                page-break-inside: avoid;
+                page-break-after: auto;
+            }}
+            
+            /* Severity labels */
+            .severity-badge {{
+                font-weight: bold;
+                padding: 0.2em 0.5em;
+                border: 1px solid #000;
+            }}
+            
+            /* URLs */
+            a[href]:after {{
+                content: " (" attr(href) ")";
+                font-size: 80%;
+                font-style: italic;
+            }}
+            
+            /* Page setup */
+            @page {{
+                size: A4;
+                margin: 0.75in;
+            }}
+            
+            @page :first {{
+                margin-top: 0.5in;
+            }}
+            
+            /* Page numbers */
+            .page-break {{
+                page-break-before: always;
+            }}
+        }}
+        
+        /* Accessibility: High contrast mode */
+        @media (prefers-contrast: high) {{
+            :root {{
+                --bg-primary: #ffffff;
+                --bg-secondary: #f0f0f0;
+                --text-primary: #000000;
+                --text-secondary: #333333;
+                --border-color: #000000;
+                --error-color: #cc0000;
+                --warning-color: #ff6600;
+            }}
+            
+            .stat-badge,
+            .severity-badge {{
+                border-width: 2px;
+            }}
+            
+            .issue-table th,
+            .issue-table td {{
+                border-width: 2px;
+            }}
+        }}
+        
+        /* Accessibility: Reduced motion */
+        @media (prefers-reduced-motion: reduce) {{
+            *,
+            *::before,
+            *::after {{
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }}
+            
+            .loading-spinner {{
+                animation: none;
+            }}
+        }}
     </style>
 </head>
 <body>
@@ -872,10 +1100,10 @@ class OptimizedDashboardGenerator:
                     <span>Code Analysis Dashboard</span>
                 </h1>
                 <div style="display: flex; gap: 1rem; align-items: center;">
-                    <a href="../../gallery.html" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.1); border-radius: 0.5rem; color: var(--text-primary); text-decoration: none; font-size: 0.875rem; transition: all 0.2s;">
+                    <a href="../../gallery.html" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.1); border-radius: 0.5rem; color: var(--text-primary); text-decoration: none; font-size: 0.85em; transition: all 0.2s;">
                         ← Back to Gallery
                     </a>
-                    <a href="../../index.html" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.1); border-radius: 0.5rem; color: var(--text-primary); text-decoration: none; font-size: 0.875rem; transition: all 0.2s;">
+                    <a href="../../index.html" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.1); border-radius: 0.5rem; color: var(--text-primary); text-decoration: none; font-size: 0.85em; transition: all 0.2s;">
                         🏠 Home
                     </a>
                 </div>

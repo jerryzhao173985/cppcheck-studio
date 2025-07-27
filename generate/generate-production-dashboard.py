@@ -490,7 +490,7 @@ class ProductionDashboardGenerator:
         }
         
         .stat-card i {
-            font-size: 2.5em;
+            font-size: 2em;
             margin-bottom: 10px;
             opacity: 0.8;
         }

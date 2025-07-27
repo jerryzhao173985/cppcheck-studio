@@ -207,7 +207,6 @@ class SimpleDashboardGenerator:
         
         // Initialize on load
         document.addEventListener('DOMContentLoaded', function() {{
-            console.log('Dashboard loaded with', allIssues.length, 'issues');
             renderIssues();
         }});
         
@@ -668,7 +667,7 @@ class SimpleDashboardGenerator:
             padding: 15px;
             text-align: left;
             font-weight: 600;
-            font-size: 0.9em;
+            font-size: 0.85em;
             color: #495057;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -822,7 +821,7 @@ class SimpleDashboardGenerator:
         .close-btn {
             background: none;
             border: none;
-            font-size: 24px;
+            font-size: 1.5em;
             cursor: pointer;
             color: #adb5bd;
             transition: color 0.2s;

@@ -648,6 +648,15 @@ export function generateStyles(): string {
             font-size: 16px; /* Prevent zoom on iOS */
         }
         
+        .stat-card .value {
+            font-size: 1.5em;
+        }
+        
+        .issues-table th, .issue-row td {
+            font-size: 0.85em;
+            padding: 10px;
+        }
+        
         .filter-buttons {
             justify-content: center;
             width: 100%;
