@@ -180,11 +180,17 @@ class OptimizedDashboardGenerator:
     <title>Code Analysis - Optimized Dashboard</title>
     <style>
         :root {{
+            /* Colors with RGB equivalents for rgba() usage */
             --bg-primary: #ffffff;
+            --bg-primary-rgb: 255, 255, 255;
             --bg-secondary: #f8f9fa;
+            --bg-secondary-rgb: 248, 249, 250;
             --bg-tertiary: #e9ecef;
+            --bg-tertiary-rgb: 233, 236, 239;
             --text-primary: #212529;
+            --text-primary-rgb: 33, 37, 41;
             --text-secondary: #6c757d;
+            --text-secondary-rgb: 108, 117, 125;
             --border-color: #dee2e6;
             --error-color: #dc3545;
             --warning-color: #ffc107;
@@ -194,6 +200,10 @@ class OptimizedDashboardGenerator:
             --hover-bg: #f8f9fa;
             --shadow: 0 1px 3px rgba(0,0,0,0.12);
             --font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', monospace;
+            
+            /* Font size variables */
+            --font-small: 0.85em;
+            --font-normal: 1em;
         }}
         
         [data-theme="dark"] {{
@@ -219,7 +229,7 @@ class OptimizedDashboardGenerator:
             color: var(--text-primary);
             line-height: 1.6;
             transition: background-color 0.3s, color 0.3s;
-            font-size: 16px; /* Base font size for consistent rem calculations */
+            font-size: 100%; /* Respect user preferences, defaults to 16px */
         }}
         
         /* Header */
@@ -231,7 +241,7 @@ class OptimizedDashboardGenerator:
             top: 0;
             z-index: 100;
             backdrop-filter: blur(10px);
-            background: rgba(var(--bg-secondary), 0.95);
+            background: rgba(var(--bg-secondary-rgb), 0.95);
         }}
         
         .header-content {{
@@ -265,7 +275,7 @@ class OptimizedDashboardGenerator:
             gap: 0.25rem;
             padding: 0.25rem 0.75rem;
             border-radius: 1rem;
-            font-size: 0.875rem;
+            font-size: var(--font-small);
             font-weight: 500;
             cursor: pointer;
             transition: transform 0.2s;
@@ -337,7 +347,7 @@ class OptimizedDashboardGenerator:
             border-radius: 0.5rem;
             background: var(--bg-primary);
             color: var(--text-primary);
-            font-size: 0.875rem;
+            font-size: var(--font-small);
         }}
         
         .search-input:focus {{
@@ -351,7 +361,7 @@ class OptimizedDashboardGenerator:
             right: 0.75rem;
             top: 50%;
             transform: translateY(-50%);
-            font-size: 0.75rem;
+            font-size: calc(var(--font-small) * 0.88); /* ~0.75em */
             color: var(--text-secondary);
         }}
         
@@ -366,7 +376,7 @@ class OptimizedDashboardGenerator:
             border-radius: 0.5rem;
             background: var(--bg-primary);
             color: var(--text-primary);
-            font-size: 0.875rem;
+            font-size: var(--font-small);
             cursor: pointer;
             transition: all 0.2s;
         }}
@@ -402,7 +412,7 @@ class OptimizedDashboardGenerator:
             display: flex;
             justify-content: space-between;
             margin-bottom: 0.5rem;
-            font-size: 0.875rem;
+            font-size: var(--font-small);
         }}
         
         .progress-bar {{
@@ -455,11 +465,11 @@ class OptimizedDashboardGenerator:
         .file-name {{
             font-weight: 500;
             font-family: var(--font-mono);
-            font-size: 0.875rem;
+            font-size: var(--font-small);
         }}
         
         .issue-count {{
-            font-size: 0.75rem;
+            font-size: calc(var(--font-small) * 0.88); /* ~0.75em */
             color: var(--text-secondary);
         }}
         
@@ -481,7 +491,7 @@ class OptimizedDashboardGenerator:
         .severity-dot.information {{ background: var(--info-color); }}
         
         .file-toggle {{
-            font-size: 0.75rem;
+            font-size: calc(var(--font-small) * 0.88); /* ~0.75em */
             color: var(--text-secondary);
         }}
         
@@ -523,7 +533,7 @@ class OptimizedDashboardGenerator:
             flex-shrink: 0;
             padding: 0.125rem 0.5rem;
             border-radius: 0.25rem;
-            font-size: 0.75rem;
+            font-size: calc(var(--font-small) * 0.88); /* ~0.75em */
             font-weight: 500;
         }}
         
@@ -533,13 +543,13 @@ class OptimizedDashboardGenerator:
         }}
         
         .issue-message {{
-            font-size: 0.875rem;
+            font-size: var(--font-small);
             margin-bottom: 0.25rem;
         }}
         
         .issue-code {{
             font-family: var(--font-mono);
-            font-size: 0.8rem;
+            font-size: calc(var(--font-small) * 0.94); /* ~0.8em */
             background: var(--bg-tertiary);
             padding: 0.25rem 0.5rem;
             border-radius: 0.25rem;
@@ -551,7 +561,7 @@ class OptimizedDashboardGenerator:
         .issue-meta {{
             display: flex;
             gap: 1rem;
-            font-size: 0.75rem;
+            font-size: calc(var(--font-small) * 0.88); /* ~0.75em */
             color: var(--text-secondary);
         }}
         
@@ -567,7 +577,7 @@ class OptimizedDashboardGenerator:
             border-radius: 0.25rem;
             background: var(--bg-primary);
             color: var(--text-primary);
-            font-size: 0.75rem;
+            font-size: calc(var(--font-small) * 0.88); /* ~0.75em */
             cursor: pointer;
             transition: all 0.2s;
         }}
@@ -687,7 +697,7 @@ class OptimizedDashboardGenerator:
             border-radius: 0.5rem;
             overflow: hidden;
             font-family: var(--font-mono);
-            font-size: 0.875rem;
+            font-size: var(--font-small);
         }}
         
         .code-line {{
@@ -736,6 +746,22 @@ class OptimizedDashboardGenerator:
         .theme-toggle:hover {{
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }}
+        
+        /* Navigation Links */
+        .nav-link {{
+            padding: 0.5rem 1rem;
+            background: rgba(255,255,255,0.1);
+            border-radius: 0.5rem;
+            color: var(--text-primary);
+            text-decoration: none;
+            font-size: var(--font-small);
+            transition: all 0.2s;
+        }}
+        
+        .nav-link:hover {{
+            background: rgba(255,255,255,0.2);
+            transform: translateY(-1px);
         }}
         
         /* Toast */
@@ -792,7 +818,7 @@ class OptimizedDashboardGenerator:
             }}
             
             .stat-badge {{
-                font-size: 0.8rem; /* Smaller stat badges */
+                font-size: calc(var(--font-small) * 0.94); /* ~0.8em */ /* Smaller stat badges */
                 padding: 0.2rem 0.5rem;
             }}
             
@@ -808,7 +834,7 @@ class OptimizedDashboardGenerator:
             }}
             
             .control-btn {{
-                font-size: 0.8rem;
+                font-size: calc(var(--font-small) * 0.94); /* ~0.8em */
                 padding: 10px 12px;
                 min-height: 44px; /* Touch target size */
             }}
@@ -838,11 +864,11 @@ class OptimizedDashboardGenerator:
             }}
             
             .issue-message {{
-                font-size: 0.8rem;
+                font-size: calc(var(--font-small) * 0.94); /* ~0.8em */
             }}
             
             .issue-code {{
-                font-size: 0.75rem;
+                font-size: calc(var(--font-small) * 0.88); /* ~0.75em */
             }}
             
             .issue-meta {{
@@ -872,10 +898,10 @@ class OptimizedDashboardGenerator:
                     <span>Code Analysis Dashboard</span>
                 </h1>
                 <div style="display: flex; gap: 1rem; align-items: center;">
-                    <a href="../../gallery.html" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.1); border-radius: 0.5rem; color: var(--text-primary); text-decoration: none; font-size: 0.875rem; transition: all 0.2s;">
+                    <a href="../../gallery.html" class="nav-link">
                         ← Back to Gallery
                     </a>
-                    <a href="../../index.html" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.1); border-radius: 0.5rem; color: var(--text-primary); text-decoration: none; font-size: 0.875rem; transition: all 0.2s;">
+                    <a href="../../index.html" class="nav-link">
                         🏠 Home
                     </a>
                 </div>

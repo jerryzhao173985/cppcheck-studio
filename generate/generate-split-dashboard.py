@@ -860,7 +860,7 @@ class SplitDashboardGenerator:
             display: inline-block;
             padding: 4px 10px;
             border-radius: 4px;
-            font-size: 0.75em;
+            font-size: 0.875em; /* 14px / 16px */
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -1242,8 +1242,9 @@ class SplitDashboardGenerator:
             }
             
             .modal-content {
-                margin: 20px;
-                width: calc(100% - 40px);
+                width: 100%;
+                max-width: calc(100% - 40px);
+                margin: 0 auto;
             }
             
             .modal-header {
