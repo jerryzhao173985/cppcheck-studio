@@ -229,19 +229,16 @@ class StandaloneVirtualDashboardGenerator:
         // Initialize
         function initialize() {{
             try {{
-                console.log('🚀 Dashboard initializing...');
                 showLoadingStatus('Loading issues data...');
                 
                 // Load issues from embedded JSONL
                 loadEmbeddedData();
-                console.log('📊 Loaded ' + state.allIssues.length + ' issues');
                 
                 // Set up virtual scrolling
                 setupVirtualScroll();
                 
                 // Initial render - CRITICAL FOR SCROLLING
                 filterData();
-                console.log('🎯 Filtered ' + state.filteredIssues.length + ' issues');
                 
                 // Multiple recovery attempts to ensure rendering
                 const attemptRender = (attempt = 1) => {{
@@ -256,7 +253,6 @@ class StandaloneVirtualDashboardGenerator:
                         if (scrollContainer) {{
                             const rect = scrollContainer.getBoundingClientRect();
                             state.containerHeight = Math.max(400, rect.height || 600);
-                            console.log('Recalculated container height:', state.containerHeight);
                         }}
                         
                         if (attempt < 3) {{
@@ -269,7 +265,6 @@ class StandaloneVirtualDashboardGenerator:
                             }}
                         }}
                     }} else if (tbody && tbody.children.length > 0) {{
-                        console.log('✅ Successfully rendered ' + tbody.children.length + ' rows');
                     }}
                 }};
                 
@@ -300,7 +295,6 @@ class StandaloneVirtualDashboardGenerator:
                     }}
                 }}).filter(Boolean);
                 
-                console.log('Loaded', state.allIssues.length, 'issues');
                 
                 // Parse code context data
                 const codeScript = document.getElementById('codeContextData');
@@ -318,7 +312,6 @@ class StandaloneVirtualDashboardGenerator:
                     }}
                 }});
                 
-                console.log('Loaded code context for', state.codeContextMap.size, 'issues');
                 
             }} catch (error) {{
                 console.error('Failed to load embedded data:', error);
@@ -336,7 +329,6 @@ class StandaloneVirtualDashboardGenerator:
                 // Ensure minimum height for proper virtual scrolling
                 const height = scrollContainer.clientHeight || scrollContainer.offsetHeight || 600;
                 state.containerHeight = Math.max(400, height - 100); // Account for header with minimum
-                console.log('Container height:', state.containerHeight);
                 renderVisibleRows();
             }};
             
@@ -625,7 +617,6 @@ class StandaloneVirtualDashboardGenerator:
         
         // Recovery function for troubleshooting
         window.recoverDashboard = function() {{
-            console.log('🔧 Running comprehensive dashboard recovery...');
             
             // Force recalculate container dimensions
             const scrollContainer = document.getElementById('scrollContainer');
@@ -638,7 +629,6 @@ class StandaloneVirtualDashboardGenerator:
             if (!scrollContainer.style.height || scrollContainer.style.height === '0px') {{
                 scrollContainer.style.height = '600px';
                 scrollContainer.style.minHeight = '400px';
-                console.log('📐 Applied default container height');
             }}
             
             // Get fresh measurements
@@ -651,17 +641,6 @@ class StandaloneVirtualDashboardGenerator:
             state.visibleEnd = Math.min(50, state.filteredIssues.length);
             state.containerHeight = Math.max(400, rect.height || 600);
             
-            console.log('📊 Recovery state:', {{
-                issues: state.allIssues.length,
-                filtered: state.filteredIssues.length,
-                containerHeight: state.containerHeight,
-                containerStyle: {{
-                    height: computedStyle.height,
-                    minHeight: computedStyle.minHeight,
-                    maxHeight: computedStyle.maxHeight,
-                    overflow: computedStyle.overflow
-                }}
-            }});
             
             // Re-filter and render
             filterData();
@@ -675,13 +654,11 @@ class StandaloneVirtualDashboardGenerator:
                     rendered = true;
                     break;
                 }}
-                console.log('Recovery render attempt ' + (i + 1) + ' failed, retrying...');
             }}
             
             // Scroll to top
             scrollContainer.scrollTop = 0;
             
-            console.log(rendered ? '✅ Recovery complete!' : '❌ Recovery failed after 3 attempts');
         }};
         
         // Initialize when DOM is ready

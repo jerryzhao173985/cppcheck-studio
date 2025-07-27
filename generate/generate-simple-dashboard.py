@@ -207,7 +207,6 @@ class SimpleDashboardGenerator:
         
         // Initialize on load
         document.addEventListener('DOMContentLoaded', function() {{
-            console.log('Dashboard loaded with', allIssues.length, 'issues');
             renderIssues();
         }});
         

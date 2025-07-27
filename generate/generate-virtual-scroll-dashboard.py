@@ -369,7 +369,6 @@ class VirtualScrollDashboardGenerator:
                 }});
                 
                 hideLoadingStatus();
-                console.log(`Dashboard initialized successfully with ${{state.allIssues.length}} issues`);
                 
             }} catch (error) {{
                 clearTimeout(initTimeout);
@@ -463,8 +462,6 @@ class VirtualScrollDashboardGenerator:
                     }}
                 }}
                 
-                console.log(`Successfully loaded ${{state.allIssues.length}} issues`);
-                
             }} catch (error) {{
                 console.error('Failed to load issues:', error);
                 throw error;
@@ -534,8 +531,6 @@ class VirtualScrollDashboardGenerator:
                         console.error('Failed to parse final context:', e);
                     }}
                 }}
-                
-                console.log('Loaded code context for', idsToLoad.length, 'issues');
             }} catch (error) {{
                 console.error('Failed to load code context:', error);
             }}
@@ -952,8 +947,6 @@ class VirtualScrollDashboardGenerator:
                 state.codeContextMap.delete(key);
                 state.loadedContextIds.delete(key);
             }});
-            
-            console.log(`Cleaned up ${{entriesToRemove}} old context entries`);
         }}
         
         // Monitor memory usage
