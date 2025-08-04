@@ -182,6 +182,7 @@ class OptimizedDashboardGenerator:
         :root {{
             --bg-primary: #ffffff;
             --bg-secondary: #f8f9fa;
+            --bg-secondary-rgb: 248, 249, 250;
             --bg-tertiary: #e9ecef;
             --text-primary: #212529;
             --text-secondary: #6c757d;
@@ -194,11 +195,14 @@ class OptimizedDashboardGenerator:
             --hover-bg: #f8f9fa;
             --shadow: 0 1px 3px rgba(0,0,0,0.12);
             --font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', monospace;
+            --font-small: 0.85em;
+            --font-normal: 1em;
         }}
         
         [data-theme="dark"] {{
             --bg-primary: #1a1a1a;
             --bg-secondary: #2d2d2d;
+            --bg-secondary-rgb: 45, 45, 45;
             --bg-tertiary: #3a3a3a;
             --text-primary: #e0e0e0;
             --text-secondary: #a0a0a0;
@@ -219,7 +223,7 @@ class OptimizedDashboardGenerator:
             color: var(--text-primary);
             line-height: 1.6;
             transition: background-color 0.3s, color 0.3s;
-            font-size: 16px; /* Base font size for consistent rem calculations */
+            font-size: 100%; /* Respect user preferences */
         }}
         
         /* Header */
@@ -231,7 +235,7 @@ class OptimizedDashboardGenerator:
             top: 0;
             z-index: 100;
             backdrop-filter: blur(10px);
-            background: rgba(var(--bg-secondary), 0.95);
+            background: rgba(var(--bg-secondary-rgb), 0.95);
         }}
         
         .header-content {{
@@ -776,10 +780,26 @@ class OptimizedDashboardGenerator:
             margin-bottom: 0.5rem;
         }}
         
+        /* Nav links */
+        .nav-link {{
+            padding: 0.5rem 1rem;
+            background: rgba(255,255,255,0.1);
+            border-radius: 0.5rem;
+            color: var(--text-primary);
+            text-decoration: none;
+            font-size: var(--font-small);
+            transition: all 0.2s;
+        }}
+        
+        .nav-link:hover {{
+            background: rgba(255,255,255,0.2);
+            transform: translateY(-1px);
+        }}
+        
         /* Responsive */
         @media (max-width: 768px) {{
             body {{
-                font-size: 14px; /* Smaller base font on mobile */
+                font-size: 87.5%; /* Smaller base font on mobile, respects user preferences */
             }}
             
             .title {{
@@ -872,10 +892,10 @@ class OptimizedDashboardGenerator:
                     <span>Code Analysis Dashboard</span>
                 </h1>
                 <div style="display: flex; gap: 1rem; align-items: center;">
-                    <a href="../../gallery.html" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.1); border-radius: 0.5rem; color: var(--text-primary); text-decoration: none; font-size: 0.875rem; transition: all 0.2s;">
+                    <a href="../../gallery.html" class="nav-link">
                         ← Back to Gallery
                     </a>
-                    <a href="../../index.html" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.1); border-radius: 0.5rem; color: var(--text-primary); text-decoration: none; font-size: 0.875rem; transition: all 0.2s;">
+                    <a href="../../index.html" class="nav-link">
                         🏠 Home
                     </a>
                 </div>

@@ -125,7 +125,7 @@ class VirtualScrollDashboardGenerator:
         <div class="controls">
             <div class="search-container">
                 <i class="fas fa-search"></i>
-                <input type="text" id="searchInput" placeholder="Search by file, message, or ID..." onkeyup="debounce(filterData, 300)()">
+                <input type="text" id="searchInput" placeholder="Search by file, message, or ID...">
             </div>
             
             <div class="filter-buttons">
@@ -228,6 +228,9 @@ class VirtualScrollDashboardGenerator:
             containerHeight: 0
         }};
         
+        // Create debounced filter function
+        const debouncedFilterData = debounce(filterData, CONFIG.SEARCH_DEBOUNCE);
+        
         // Initialize
         async function initialize() {{
             try {{
@@ -238,6 +241,9 @@ class VirtualScrollDashboardGenerator:
                 
                 // Set up virtual scrolling
                 setupVirtualScroll();
+                
+                // Set up search event listener
+                document.getElementById('searchInput').addEventListener('input', debouncedFilterData);
                 
                 // Initial render
                 filterData();
@@ -662,6 +668,12 @@ class VirtualScrollDashboardGenerator:
     def generate_styles(self):
         """Generate CSS styles with fixed alignment"""
         return """
+        :root {
+            --font-small: 0.85em;
+            --font-normal: 1em;
+            --font-large: 1.1em;
+        }
+        
         * { box-sizing: border-box; margin: 0; padding: 0; }
         
         body {
@@ -670,7 +682,7 @@ class VirtualScrollDashboardGenerator:
             color: #2d3748;
             line-height: 1.6;
             overflow: hidden;
-            font-size: 16px; /* Base font size for consistent rem/em calculations */
+            font-size: 100%; /* Respect user preferences */
         }
         
         .container {
@@ -816,7 +828,7 @@ class VirtualScrollDashboardGenerator:
             padding: 10px 15px 10px 40px;
             border: 1px solid #e2e8f0;
             border-radius: 6px;
-            font-size: 0.85em; /* Consistent with table font size */
+            font-size: var(--font-small);
             transition: border-color 0.2s;
         }
         
@@ -1182,7 +1194,7 @@ class VirtualScrollDashboardGenerator:
             border: 1px solid #e2e8f0;
             border-radius: 8px;
             padding: 15px;
-            font-size: 0.85em; /* Consistent with table font size */
+            font-size: var(--font-small);
             line-height: 1.6;
         }
         
@@ -1257,7 +1269,7 @@ class VirtualScrollDashboardGenerator:
         /* Responsive design */
         @media (max-width: 768px) {
             body {
-                font-size: 14px; /* Smaller base font on mobile */
+                font-size: 87.5%; /* Smaller base font on mobile, respects user preferences */
             }
             
             .header h1 {

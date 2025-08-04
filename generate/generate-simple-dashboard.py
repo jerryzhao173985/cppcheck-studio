@@ -466,6 +466,12 @@ class SimpleDashboardGenerator:
     def generate_styles(self):
         """Generate CSS styles"""
         return """
+        :root {
+            --font-small: 0.875em;
+            --font-normal: 1em;
+            --font-large: 1.1em;
+        }
+        
         * {
             margin: 0;
             padding: 0;
@@ -477,7 +483,7 @@ class SimpleDashboardGenerator:
             background: #f8f9fa;
             color: #2c3e50;
             line-height: 1.6;
-            font-size: 16px; /* Base font size */
+            font-size: 100%; /* Respect user preferences */
         }
         
         .container {
@@ -594,7 +600,7 @@ class SimpleDashboardGenerator:
             padding: 12px 15px 12px 45px;
             border: 1px solid #ddd;
             border-radius: 8px;
-            font-size: 0.875em; /* 14px / 16px */
+            font-size: var(--font-small);
             transition: border-color 0.2s;
         }
         
@@ -616,7 +622,7 @@ class SimpleDashboardGenerator:
             border-radius: 8px;
             cursor: pointer;
             transition: all 0.2s;
-            font-size: 0.875em; /* 14px / 16px */
+            font-size: var(--font-small);
             font-weight: 500;
         }
         
@@ -643,7 +649,7 @@ class SimpleDashboardGenerator:
             padding: 10px 0;
             margin-bottom: 10px;
             color: #7f8c8d;
-            font-size: 0.875em; /* 14px / 16px */
+            font-size: var(--font-small);
         }
         
         /* Table */
@@ -686,7 +692,7 @@ class SimpleDashboardGenerator:
         
         .issue-row td {
             padding: 15px;
-            font-size: 0.875em; /* 14px / 16px */
+            font-size: var(--font-small);
         }
         
         .indicator-cell {
@@ -862,7 +868,7 @@ class SimpleDashboardGenerator:
             border-radius: 8px;
             margin-bottom: 30px;
             font-family: 'Monaco', 'Consolas', monospace;
-            font-size: 0.875em; /* 14px / 16px */
+            font-size: var(--font-small);
         }
         
         .code-preview {
@@ -888,7 +894,7 @@ class SimpleDashboardGenerator:
         @media (max-width: 768px) {
             /* Core font size reduction */
             body {
-                font-size: 14px; /* Reduced from 16px for better content density */
+                font-size: 87.5%; /* Reduced for better content density, respects user preferences */
             }
             
             /* Header layout adjustments */
