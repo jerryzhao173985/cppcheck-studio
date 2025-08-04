@@ -564,6 +564,12 @@ class SplitDashboardGenerator:
     def generate_styles(self):
         """Generate CSS styles"""
         return """
+        :root {
+            --font-small: 0.85em;
+            --font-normal: 1em;
+            --font-large: 1.1em;
+        }
+        
         * { box-sizing: border-box; margin: 0; padding: 0; }
         
         body {
@@ -571,7 +577,7 @@ class SplitDashboardGenerator:
             background: #f5f7fa;
             color: #2d3748;
             line-height: 1.6;
-            font-size: 16px; /* Base font size for consistent rem/em calculations */
+            font-size: 100%; /* Respect user preferences */
         }
         
         .container {
@@ -709,7 +715,7 @@ class SplitDashboardGenerator:
             padding: 10px 15px 10px 40px;
             border: 1px solid #e2e8f0;
             border-radius: 8px;
-            font-size: 0.85em; /* Consistent with table font size */
+            font-size: var(--font-small);
             transition: border-color 0.2s;
         }
         
@@ -822,7 +828,7 @@ class SplitDashboardGenerator:
         
         .issues-table td {
             padding: 15px;
-            font-size: 0.85em; /* Consistent with table font size */
+            font-size: var(--font-small);
         }
         
         .file-cell {
@@ -1043,7 +1049,7 @@ class SplitDashboardGenerator:
             border: 1px solid #e2e8f0;
             border-radius: 8px;
             padding: 15px;
-            font-size: 0.85em; /* Consistent with table font size */
+            font-size: var(--font-small);
             line-height: 1.6;
         }
         
@@ -1089,7 +1095,7 @@ class SplitDashboardGenerator:
         }
         
         .issue-explanation h5 {
-            font-size: 0.85em; /* Consistent with table font size */
+            font-size: var(--font-small);
             font-weight: 600;
             color: #2c5282;
             margin-bottom: 10px;
@@ -1146,7 +1152,7 @@ class SplitDashboardGenerator:
         /* Responsive design */
         @media (max-width: 768px) {
             body {
-                font-size: 14px; /* Smaller base font on mobile */
+                font-size: 87.5%; /* Smaller base font on mobile, respects user preferences */
             }
             
             .header h1 {
