@@ -6,48 +6,49 @@
 
 ```bash
 # 1. Run CPPCheck on your C++ code
-cppcheck --enable=all --xml --xml-version=2 your-project/ 2> analysis.xml
+cppcheck --enable=all --format=json your-project/ > analysis.json
 
-# 2. Convert XML to JSON
-python3 utils/xml2json-simple.py analysis.xml > analysis.json
+# 2. Generate dashboard with unified CLI
+python3 cppcheck-studio.py analyze analysis.json
 
-# 3. Generate dashboard (choose one):
-python3 generate/generate-standalone-virtual-dashboard.py analysis.json dashboard.html
-
-# 4. Open in browser
+# 3. Open in browser
 open dashboard.html
+```
+
+### With Code Context (Recommended)
+
+```bash
+# Add code snippets around issues
+python3 cppcheck-studio.py add-context analysis.json
+python3 cppcheck-studio.py analyze analysis-with-context.json
 ```
 
 ## 📁 What's in this package?
 
 ```
 cppcheck-studio/
+├── cppcheck-studio.py             # 🎯 Unified CLI (NEW!)
+├── add-code-context.py            # Enhanced code context tool
+├── quickstart.py                  # Interactive setup wizard
+│
 ├── generate/                      # Python dashboard generators
-│   ├── generate-standalone-virtual-dashboard.py  # ⭐ RECOMMENDED - All features
-│   ├── generate-production-dashboard.py         # Minimal size, fast
-│   ├── generate-virtual-scroll-dashboard.py     # For huge datasets (100k+ issues)  
-│   ├── generate-split-dashboard.py              # Splits data into multiple files
-│   ├── generate-optimized-dashboard.py          # Used by GitHub Actions workflow
-│   └── generate-simple-dashboard.py             # Fallback for GitHub Actions
+│   ├── generate-standalone-virtual-dashboard.py  # ⭐ DEFAULT - Virtual scrolling
+│   ├── generate-production-dashboard.py         # Minimal size option
+│   ├── generate-virtual-scroll-dashboard.py     # Legacy virtual scroll
+│   ├── generate-split-dashboard.py              # Splits data into files
+│   ├── generate-optimized-dashboard.py          # GitHub Actions compatible
+│   └── generate-simple-dashboard.py             # GitHub Actions fallback
 │
-├── cppcheck-dashboard-generator/  # TypeScript/npm package (same features)
-│   └── Full npm package with TypeScript implementation
-│
-├── utils/                         # Helper utilities
-│   ├── xml2json-simple.py        # Convert CPPCheck XML to JSON
-│   └── add-code-context.py       # Add code snippets to issues
+├── cppcheck-dashboard-generator/  # TypeScript/npm package
+│   ├── src/                      # TypeScript source files
+│   ├── dist/                     # Compiled JavaScript
+│   └── package.json              # npm configuration
 │
 ├── scripts/                       # Workflow support scripts
-│   ├── generate-summary.py       # Generate issue summary
-│   ├── generate-detailed-report.py # Generate detailed report
-│   ├── extract-issue-breakdown.py  # Extract issue statistics
-│   └── create-job-summary.sh     # Create GitHub job summary
-│
-├── examples/                      # Sample data and scripts
-│   └── quickstart.sh             # Example workflow
+│   └── Various utility scripts for CI/CD
 │
 └── docs/                         # Documentation
-    ├── QUICK_START.md           # Detailed getting started
+    └── Comprehensive guides and references
     ├── GENERATOR_COMPARISON.md   # Which generator to use
     └── TROUBLESHOOTING.md       # Common issues
 ```
